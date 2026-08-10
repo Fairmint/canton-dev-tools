@@ -1,0 +1,80 @@
+name: LocalNet Smoke
+
+# LocalNet lifecycle + CIP-56 transfer smoke. Intended to become a required PR check
+# once Docker image caching is finalized (TODO(ENG-1635)).
+#
+# Tradeoff vs nightly-only: first-run image pulls dominate wall time (~10–15m) and need
+# Docker/Compose + disk on the runner. We still run on pull_request so LocalNet regressions
+# block merges; keep workflow_dispatch for manual re-runs. No scheduled job — PR coverage is
+# the regression gate.
+#
+# Uses Splice TestTokenV2 (not a Fairmint token).
+#
+# Docker readiness notes:
+# - The ubuntu-latest runner usually has Docker available via the Actions service, but LocalNet
+#   also needs Compose v2, passwordless sudo for host aliases / dockerd bootstrap in constrained
+#   environments, and enough disk for Splice image pulls.
+# - First-run image pulls dominate wall time; prefer a warmed runner cache once the shared LocalNet
+#   image strategy is finalized (TODO(ENG-1635)).
+# - Port 3000 must be free (cn-quickstart nginx binds 127.0.0.1:3000).
+# - If nginx was created without a network after a failed start, remove it before retrying:
+#   `docker rm -f nginx`.
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  localnet-smoke:
+    runs-on: ubuntu-latest
+    # Image pulls + DSO bootstrap + CIP-56 transfer routinely exceed 15m on a cold runner.
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: npm ci
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Fetch Splice TestTokenV2 fixture DAR
+        run: npm run fixture:splice-test-token-v2:fetch
+
+      # TODO(ENG-1635): harden GH Actions Docker provisioning / image caching for LocalNet.
+      # This job is best-effort until the shared runner image and cache strategy are finalized.
+      - name: Start LocalNet
+        id: localnet-start
+        run: |
+          set -euo pipefail
+          npm run localnet:start
+
+      - name: Readiness
+        id: localnet-readiness
+        run: npm run localnet:readiness
+
+      # Prefer a real step with clear failure when LocalNet / Docker is not ready.
+      # Do NOT invent a Fairmint token — uses fixtures/splice-test-token-v2 (CIP-112 capable).
+      - name: CIP-56 / CIP-112 transfer smoke (Splice TestTokenV2)
+        id: cip56-transfer
+        run: |
+          set -euo pipefail
+          npm run localnet:cip56-transfer
+
+      - name: Diagnostics on failure
+        if: failure()
+        run: npm run localnet:diagnostics
+
+      - name: Teardown
+        if: always()
+        run: npm run localnet:teardown

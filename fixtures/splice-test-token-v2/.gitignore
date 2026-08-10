@@ -1,0 +1,2 @@
+# DAR binaries are fetched on demand; never commit them.
+*.dar

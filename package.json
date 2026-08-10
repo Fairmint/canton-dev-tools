@@ -1,0 +1,98 @@
+{
+  "name": "@fairmint/canton-dev-tools",
+  "version": "0.1.0",
+  "description": "Shared LocalNet CLI and Canton integration-test helpers for Fairmint",
+  "keywords": [
+    "canton",
+    "localnet",
+    "testing",
+    "fairmint"
+  ],
+  "homepage": "https://github.com/Fairmint/canton-dev-tools#readme",
+  "bugs": {
+    "url": "https://github.com/Fairmint/canton-dev-tools/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Fairmint/canton-dev-tools.git"
+  },
+  "license": "MIT",
+  "author": "Fairmint",
+  "config": {
+    "localnet_protocol_version": "35",
+    "localnet_quickstart_ref": "2f4edfc17621a7dfb6d44357050c22f4b3914c89",
+    "localnet_scribe_version": "0.6.14",
+    "localnet_splice_version": "0.6.14"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "canton-dev-tools": "bin/canton-dev-tools",
+    "canton-localnet": "bin/canton-dev-tools"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./testing": {
+      "types": "./dist/testing/index.d.ts",
+      "default": "./dist/testing/index.js"
+    }
+  },
+  "files": [
+    "bin/canton-dev-tools",
+    "scripts/localnet-cloud.sh",
+    "dist/**"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "check:package-artifacts": "tsx scripts/check-package-artifacts.ts",
+    "clean": "rm -rf dist coverage",
+    "fix": "npm run lint:fix && npm run format:fix",
+    "format": "prettier --check .",
+    "format:fix": "prettier --write .",
+    "lint": "eslint . --max-warnings=0",
+    "lint:fix": "eslint . --fix --max-warnings=0",
+    "localnet": "bash ./bin/canton-dev-tools",
+    "localnet:diagnostics": "npm run -s localnet -- diagnostics",
+    "localnet:readiness": "npm run -s localnet -- readiness",
+    "localnet:setup": "npm run -s localnet -- setup",
+    "localnet:start": "npm run -s localnet -- start",
+    "localnet:teardown": "npm run -s localnet -- teardown",
+    "fixture:dar-lifecycle:build": "bash scripts/build-dar-lifecycle-fixture.sh",
+    "fixture:splice-test-token-v2:fetch": "tsx scripts/fetch-splice-test-token-v2.ts",
+    "localnet:cip56-transfer": "CANTON_CIP56_REQUIRE_LOCALNET=1 tsx scripts/run-cip56-transfer-smoke.ts",
+    "pack:check": "npm run check:package-artifacts",
+    "prepack": "npm run clean && npm run build",
+    "prepare-release": "tsx scripts/prepare-release.ts",
+    "prepublishOnly": "npm run prepack",
+    "test": "npm run -s typecheck && jest",
+    "test:ci": "npm run -s typecheck && jest --runInBand",
+    "test:watch": "jest --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "@fairmint/canton-node-sdk": ">=0.0.232 <0.1.0"
+  },
+  "devDependencies": {
+    "@fairmint/canton-node-sdk": "0.0.251",
+    "@types/jest": "30.0.0",
+    "@types/node": "22.15.29",
+    "@typescript-eslint/eslint-plugin": "8.62.1",
+    "@typescript-eslint/parser": "8.62.1",
+    "eslint": "9.39.2",
+    "eslint-plugin-unused-imports": "4.4.1",
+    "jest": "30.4.2",
+    "prettier": "3.8.4",
+    "ts-jest": "29.4.11",
+    "tsx": "4.23.0",
+    "typescript": "5.9.3"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

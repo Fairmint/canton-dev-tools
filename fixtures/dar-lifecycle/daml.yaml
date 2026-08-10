@@ -1,0 +1,13 @@
+# Minimal internal fixture for DAR lifecycle tooling.
+# CI/scripts only — never published with @fairmint/canton-dev-tools.
+#
+# sdk-version may be bumped when the shared LocalNet / dpm install path is finalized.
+sdk-version: 3.4.10
+name: DarLifecycle
+source: daml
+version: 0.0.1
+dependencies:
+  - daml-prim
+  - daml-stdlib
+build-options:
+  - --target=2.1

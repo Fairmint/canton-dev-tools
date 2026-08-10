@@ -1,0 +1,136 @@
+import { execFileSync } from 'node:child_process';
+import {
+  chmodSync,
+  copyFileSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { resolve } from 'node:path';
+
+const REPO_ROOT = resolve(__dirname, '../../..');
+const PACKAGE_JSON = JSON.parse(readFileSync(resolve(REPO_ROOT, 'package.json'), 'utf8')) as {
+  config: {
+    localnet_quickstart_ref: string;
+    localnet_splice_version: string;
+    localnet_scribe_version: string;
+    localnet_protocol_version: string;
+  };
+};
+
+const DEFAULT_QUICKSTART_REF = PACKAGE_JSON.config.localnet_quickstart_ref;
+const DEFAULT_SPLICE_VERSION = PACKAGE_JSON.config.localnet_splice_version;
+const DEFAULT_SCRIBE_VERSION = PACKAGE_JSON.config.localnet_scribe_version;
+const DEFAULT_PROTOCOL_VERSION = PACKAGE_JSON.config.localnet_protocol_version;
+
+function withPackagedBin(
+  localnetScriptBody: string,
+  run: (localnetBin: string, packageRoot: string) => string,
+  options: { spliceVersionFile?: string } = {}
+): string {
+  const packageRoot = mkdtempSync(resolve(tmpdir(), 'canton-dev-tools-bin-'));
+  const localnetBin = resolve(packageRoot, 'bin/canton-dev-tools');
+
+  mkdirSync(resolve(packageRoot, 'bin'), { recursive: true });
+  mkdirSync(resolve(packageRoot, 'scripts'), { recursive: true });
+  copyFileSync(resolve(REPO_ROOT, 'bin/canton-dev-tools'), localnetBin);
+  chmodSync(localnetBin, 0o755);
+  writeFileSync(resolve(packageRoot, 'scripts/localnet-cloud.sh'), localnetScriptBody);
+
+  if (options.spliceVersionFile !== undefined) {
+    mkdirSync(resolve(packageRoot, 'libs/splice'), { recursive: true });
+    writeFileSync(resolve(packageRoot, 'libs/splice/VERSION'), options.spliceVersionFile);
+  }
+
+  try {
+    return run(localnetBin, packageRoot);
+  } finally {
+    rmSync(packageRoot, { recursive: true, force: true });
+  }
+}
+
+function runPackagedLocalnetWithVersion(version: string): string {
+  return withPackagedBin(
+    'printf "%s" "${CANTON_LOCALNET_SPLICE_VERSION}"\n',
+    (localnetBin) =>
+      execFileSync(localnetBin, ['status'], {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          CANTON_LOCALNET_SPLICE_VERSION: '',
+        },
+      }),
+    { spliceVersionFile: version }
+  );
+}
+
+describe('canton-dev-tools pin ownership', (): void => {
+  it('hardcodes package.json config pins in the packaged binary', (): void => {
+    const localnetBin = readFileSync(resolve(REPO_ROOT, 'bin/canton-dev-tools'), 'utf8');
+
+    expect(localnetBin).toContain(`DEFAULT_QUICKSTART_REF="${DEFAULT_QUICKSTART_REF}"`);
+    expect(localnetBin).toContain(`DEFAULT_SPLICE_VERSION="${DEFAULT_SPLICE_VERSION}"`);
+    expect(localnetBin).toContain(`DEFAULT_SCRIBE_VERSION="${DEFAULT_SCRIBE_VERSION}"`);
+    expect(localnetBin).toContain(`DEFAULT_PROTOCOL_VERSION="${DEFAULT_PROTOCOL_VERSION}"`);
+  });
+
+  it('exports all four LocalNet pins for npx / direct binary invocations', (): void => {
+    const output = withPackagedBin(
+      [
+        'printf "splice=%s\\n" "${CANTON_LOCALNET_SPLICE_VERSION}"',
+        'printf "scribe=%s\\n" "${CANTON_LOCALNET_SCRIBE_VERSION}"',
+        'printf "protocol=%s\\n" "${CANTON_LOCALNET_PROTOCOL_VERSION}"',
+      ].join('\n'),
+      (localnetBin, packageRoot) =>
+        execFileSync(localnetBin, ['status'], {
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            CANTON_LOCALNET_CACHE_DIR: resolve(packageRoot, 'cache'),
+            HOME: resolve(packageRoot, 'home'),
+            CANTON_LOCALNET_SPLICE_VERSION: '',
+            CANTON_LOCALNET_SCRIBE_VERSION: '',
+            CANTON_LOCALNET_PROTOCOL_VERSION: '',
+          },
+        })
+    );
+
+    expect(output.trim().split('\n')).toEqual([
+      `splice=${DEFAULT_SPLICE_VERSION}`,
+      `scribe=${DEFAULT_SCRIBE_VERSION}`,
+      `protocol=${DEFAULT_PROTOCOL_VERSION}`,
+    ]);
+  });
+
+  it('uses a non-empty trimmed packaged Splice version', (): void => {
+    expect(runPackagedLocalnetWithVersion('  1.2.3 \n')).toBe('1.2.3');
+  });
+
+  it('falls back to the built-in Splice version when the packaged version is blank', (): void => {
+    expect(runPackagedLocalnetWithVersion(' \n\t')).toBe(DEFAULT_SPLICE_VERSION);
+  });
+});
+
+describe('canton-dev-tools command aliases', (): void => {
+  it.each([
+    ['readiness', 'smoke'],
+    ['diagnostics', 'logs'],
+    ['teardown', 'stop'],
+  ] as const)('maps %s to %s for the downstream script', (productCommand, legacyCommand): void => {
+    const output = withPackagedBin('printf "%s" "$1"\n', (localnetBin, packageRoot) =>
+      execFileSync(localnetBin, [productCommand], {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          CANTON_LOCALNET_CACHE_DIR: resolve(packageRoot, 'cache'),
+          HOME: resolve(packageRoot, 'home'),
+        },
+      })
+    );
+
+    expect(output).toBe(legacyCommand);
+  });
+});
