@@ -30,6 +30,13 @@ describe('testing helpers', (): void => {
     const config = buildLocalnetClientConfig();
     expect(config.apis?.LEDGER_JSON_API?.apiUrl).toBe('http://ledger.example:3975');
     expect(config.provider).toBe('app-provider');
+    expect(config.authUrl).toContain('openid-connect/token');
+    expect(config.apis?.LEDGER_JSON_API?.auth).toMatchObject({
+      grantType: 'password',
+      clientId: 'app-provider-unsafe',
+      username: 'app-provider',
+    });
+    expect(config.apis?.LEDGER_JSON_API?.auth).not.toHaveProperty('bearerToken');
   });
 
   it('creates a shared-secret JWT and stable test ids', (): void => {

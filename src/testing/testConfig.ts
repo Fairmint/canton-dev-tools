@@ -52,7 +52,8 @@ export function buildLocalnetClientConfig(): ClientConfig {
     Boolean(authUrl) ||
     Boolean(getEnv('FAIRMINT_TEST_CLIENT_ID')) ||
     Boolean(getEnv('FAIRMINT_TEST_SHARED_SECRET'));
-  const hasEndpointOverride = Boolean(ledgerApiUrl) || Boolean(validatorApiUrl) || Boolean(scanApiUrl);
+  const hasEndpointOverride =
+    Boolean(ledgerApiUrl) || Boolean(validatorApiUrl) || Boolean(scanApiUrl);
 
   if (!hasAuthOverride && !hasEndpointOverride) {
     // SDK built-in LocalNet OAuth2 defaults (cn-quickstart option 2).
@@ -62,23 +63,29 @@ export function buildLocalnetClientConfig(): ClientConfig {
     };
   }
 
-  // URL-only overrides keep OAuth defaults via buildAuthConfig when authUrl is unset.
+  // URL-only overrides keep package OAuth2 defaults (Keycloak password grant).
+  const resolvedAuthUrl =
+    authUrl ??
+    (!hasAuthOverride
+      ? 'http://localhost:8082/realms/AppProvider/protocol/openid-connect/token'
+      : undefined);
+
   return {
     network,
     provider: 'app-provider',
-    ...(authUrl ? { authUrl } : {}),
+    ...(resolvedAuthUrl ? { authUrl: resolvedAuthUrl } : {}),
     apis: {
       LEDGER_JSON_API: {
         apiUrl: ledgerApiUrl ?? 'http://localhost:3975',
-        auth: buildAuthConfig('LEDGER_JSON_API'),
+        auth: buildAuthConfig('LEDGER_JSON_API', { preferOAuth: !hasAuthOverride }),
       },
       VALIDATOR_API: {
         apiUrl: validatorApiUrl ?? 'http://localhost:3903',
-        auth: buildAuthConfig('VALIDATOR_API'),
+        auth: buildAuthConfig('VALIDATOR_API', { preferOAuth: !hasAuthOverride }),
       },
       SCAN_API: {
         apiUrl: scanApiUrl ?? 'http://localhost:4000',
-        auth: buildAuthConfig('SCAN_API'),
+        auth: buildAuthConfig('SCAN_API', { preferOAuth: !hasAuthOverride }),
       },
     },
   };
@@ -87,7 +94,10 @@ export function buildLocalnetClientConfig(): ClientConfig {
 /** @deprecated Prefer {@link buildLocalnetClientConfig}. */
 export const buildIntegrationTestClientConfig = buildLocalnetClientConfig;
 
-function buildAuthConfig(apiType: string): AuthConfig {
+function buildAuthConfig(
+  apiType: string,
+  options: { preferOAuth?: boolean } = {}
+): AuthConfig {
   const apiPrefix = `FAIRMINT_TEST_${apiType}`;
   const authUrl = getEnv('FAIRMINT_TEST_AUTH_URL');
   const clientId =
@@ -100,6 +110,17 @@ function buildAuthConfig(apiType: string): AuthConfig {
       grantType: 'client_credentials',
       clientId,
       ...(clientSecret ? { clientSecret } : {}),
+    };
+  }
+
+  if (options.preferOAuth) {
+    // cn-quickstart LocalNet OAuth2 (app-provider-unsafe password grant).
+    return {
+      grantType: 'password',
+      clientId: 'app-provider-unsafe',
+      username: 'app-provider',
+      password: 'abc123',
+      scope: 'openid',
     };
   }
 
