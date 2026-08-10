@@ -27,11 +27,3 @@ stubs skip cleanly when it is missing:
 ```bash
 npm run fixture:dar-lifecycle:build
 ```
-
-## TODOs (ENG-1635 follow-ups)
-
-- [ ] CI job that installs dpm and builds this DAR
-- [ ] Upload the DAR to LocalNet Ledger JSON API
-- [ ] Vet / package status checks against running LocalNet
-- [ ] Breaking-upgrade scenario (intentionally incompatible package bump)
-- [ ] Wire into CIP-56 / CIP-112 transfer smoke using Splice reference fixtures (not a Fairmint token)

@@ -50,7 +50,7 @@ import {
 } from '@fairmint/canton-dev-tools/testing';
 ```
 
-CIP-56 / CIP-112 helpers target the Splice `splice-test-token-v2` reference DAR (not Fairmint EquityTokens).
+CIP-56 / CIP-112 helpers target the Splice `splice-test-token-v2` reference DAR.
 
 ## Development
 

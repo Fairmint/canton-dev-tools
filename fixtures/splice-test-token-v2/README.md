@@ -4,9 +4,6 @@ Internal reference DAR from
 [`canton-network/splice`](https://github.com/canton-network/splice) used for LocalNet CIP-56
 holdings and CIP-112 transfer-instruction smoke tests.
 
-**Do not invent a Fairmint token for this path.** Prefer this Splice TestTokenV2 DAR
-(CIP-112 capable). Do not use Fairmint EquityTokens.
-
 ## Provenance
 
 | Field         | Value                                                                       |

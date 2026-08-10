@@ -83,7 +83,7 @@ describe('CIP-56 / CIP-112 Splice TestTokenV2 LocalNet transfer', (): void => {
     expect(mint.choiceArgument['receiver']).toEqual(providerLessAccount('Alice::party'));
     expect(transfer.choiceArgument['transfer']).toMatchObject({
       instrumentId: spliceTestTokenV2Instrument('Admin::party'),
-      amount: '10.0',
+      amount: '10',
     });
     expect(accept.choice).toBe('TransferInstruction_Accept');
 
@@ -130,8 +130,8 @@ describe('CIP-56 / CIP-112 Splice TestTokenV2 LocalNet transfer', (): void => {
     expect(result.alicePartyId.length).toBeGreaterThan(0);
     expect(result.bobPartyId.length).toBeGreaterThan(0);
     expect(result.tokenRulesContractId.length).toBeGreaterThan(0);
-    expect(result.aliceBalance).toBe('40.0');
-    expect(result.bobBalance).toBe('10.0');
+    expect(result.aliceBalance).toBe('40');
+    expect(result.bobBalance).toBe('10');
     expect(result.mintOfferContractId.length).toBeGreaterThan(0);
     expect(result.transferInstructionContractId.length).toBeGreaterThan(0);
   }, 300_000);

@@ -142,6 +142,7 @@ describe('CIP-56 / CIP-112 Splice TestTokenV2 helpers', (): void => {
     expect(tinyMint.choiceArgument['amount']).toBe('0.0000001');
     expect(formatDamlNumeric(0.0000001)).toBe('0.0000001');
     expect(formatDamlNumeric('1.2500000000')).toBe('1.25');
+    expect(() => formatDamlNumeric(0.00000000001)).toThrow(/cannot be represented exactly/);
 
     const transfer = buildTransferFactoryTransferCommand({
       transferFactoryContractId: 'cid-rules',

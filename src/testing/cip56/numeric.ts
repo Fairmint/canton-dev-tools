@@ -83,9 +83,14 @@ export function formatDamlNumeric(
     throw new Error(`Invalid Daml Numeric amount: ${String(amount)}`);
   }
 
-  // toFixed never emits scientific notation; parse back through the string path
-  // so we reject values that still cannot fit the instrument scale cleanly.
+  // toFixed never emits scientific notation, but it rounds. Reject inputs that are not
+  // exactly representable at `scale` so command builders cannot silently mint/transfer 0.
   const fixed = amount.toFixed(scale);
+  if (Number(fixed) !== amount) {
+    throw new Error(
+      `Number ${String(amount)} cannot be represented exactly as a Daml Numeric at scale ${scale}; pass a decimal string instead`
+    );
+  }
   const units = parseDamlNumericToBaseUnits(fixed, scale);
   return formatDamlNumericFromBaseUnits(units, scale);
 }

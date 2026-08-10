@@ -57,8 +57,8 @@ import {
 
 export { SPLICE_TEST_TOKEN_V2_INSTRUMENT_DECIMALS };
 
-const DEFAULT_MINT_AMOUNT = '50.0';
-const DEFAULT_TRANSFER_AMOUNT = '10.0';
+const DEFAULT_MINT_AMOUNT = '50';
+const DEFAULT_TRANSFER_AMOUNT = '10';
 
 export interface Cip56TransferSmokeOptions {
   readonly packageRoot?: string;
