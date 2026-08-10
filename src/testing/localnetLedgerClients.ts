@@ -1,13 +1,15 @@
 /** Role-checked Ledger JSON API clients for either cn-quickstart LocalNet authentication mode. */
 
-import { CantonRuntime, LedgerJsonApiClient } from '@fairmint/canton-node-sdk';
+import { CantonRuntime, LedgerJsonApiClient, ValidatorApiClient } from '@fairmint/canton-node-sdk';
 import { createSharedSecretJwt } from './testConfig';
 
 const LEDGER_API_URL = 'http://localhost:3975';
+const VALIDATOR_API_URL = 'http://localhost:3903';
 const OAUTH_TOKEN_URL = 'http://localhost:8082/realms/AppProvider/protocol/openid-connect/token';
 
 let participantAdminClientPromise: Promise<LedgerJsonApiClient> | undefined;
 let nonAdminClientPromise: Promise<LedgerJsonApiClient> | undefined;
+let validatorClientPromise: Promise<ValidatorApiClient> | undefined;
 
 /** Resolve a participant-admin client without assuming LocalNet auth mode. */
 export async function getLocalnetParticipantAdminLedgerClient(): Promise<LedgerJsonApiClient> {
@@ -63,6 +65,39 @@ async function resolveRoleCheckedClient(
   throw new Error('Could not authenticate a role-checked LocalNet Ledger client');
 }
 
+/**
+ * Resolve a Validator API client for LocalNet party onboarding (`createParty`).
+ *
+ * Tries shared-secret then OAuth2 app-provider runtimes, matching ledger client auth resolution.
+ */
+export async function getLocalnetValidatorClient(): Promise<ValidatorApiClient> {
+  validatorClientPromise ??= resolveValidatorClient([
+    createSharedSecretValidatorClient('ledger-api-user'),
+    createOAuthValidatorClient(),
+  ]);
+  return validatorClientPromise;
+}
+
+async function resolveValidatorClient(
+  candidates: readonly ValidatorApiClient[]
+): Promise<ValidatorApiClient> {
+  let lastAuthenticationError: unknown;
+
+  for (const candidate of candidates) {
+    try {
+      await candidate.getValidatorUserInfo();
+      return candidate;
+    } catch (error) {
+      lastAuthenticationError = error;
+    }
+  }
+
+  if (lastAuthenticationError instanceof Error) {
+    throw lastAuthenticationError;
+  }
+  throw new Error('Could not authenticate a LocalNet Validator API client');
+}
+
 function createOAuthAdminClient(): LedgerJsonApiClient {
   return new LedgerJsonApiClient(
     new CantonRuntime({ network: 'localnet', provider: 'app-provider' })
@@ -91,6 +126,12 @@ function createOAuthNonAdminClient(): LedgerJsonApiClient {
   );
 }
 
+function createOAuthValidatorClient(): ValidatorApiClient {
+  return new ValidatorApiClient(
+    new CantonRuntime({ network: 'localnet', provider: 'app-provider' })
+  );
+}
+
 function createSharedSecretClient(subject: string): LedgerJsonApiClient {
   return new LedgerJsonApiClient(
     new CantonRuntime({
@@ -104,6 +145,35 @@ function createSharedSecretClient(subject: string): LedgerJsonApiClient {
             grantType: 'client_credentials',
             clientId: `shared-secret-${subject}`,
             bearerToken: createSharedSecretJwt({ subject }),
+          },
+        },
+      },
+    })
+  );
+}
+
+function createSharedSecretValidatorClient(subject: string): ValidatorApiClient {
+  const bearerToken = createSharedSecretJwt({ subject });
+  return new ValidatorApiClient(
+    new CantonRuntime({
+      network: 'localnet',
+      provider: 'app-provider',
+      authUrl: '',
+      apis: {
+        LEDGER_JSON_API: {
+          apiUrl: LEDGER_API_URL,
+          auth: {
+            grantType: 'client_credentials',
+            clientId: `shared-secret-${subject}`,
+            bearerToken,
+          },
+        },
+        VALIDATOR_API: {
+          apiUrl: VALIDATOR_API_URL,
+          auth: {
+            grantType: 'client_credentials',
+            clientId: `shared-secret-${subject}`,
+            bearerToken,
           },
         },
       },

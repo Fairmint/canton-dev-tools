@@ -9,6 +9,7 @@ export {
 export {
   getLocalnetNonAdminLedgerClient,
   getLocalnetParticipantAdminLedgerClient,
+  getLocalnetValidatorClient,
 } from './localnetLedgerClients';
 export {
   buildDisclosedContract,
@@ -51,6 +52,11 @@ export {
   providerLessAccountConfig,
   spliceTestTokenV2DarPath,
   spliceTestTokenV2Instrument,
+  parseTransferInstructionResult,
+  runCip56TransferSmoke,
+  toCreateCommand,
+  toExerciseCommand,
+  SPLICE_TEST_TOKEN_V2_INSTRUMENT_DECIMALS,
   type BuildOfferMintParams,
   type BuildTokenRulesCreateParams,
   type BuildTransferFactoryTransferParams,
@@ -63,6 +69,9 @@ export {
   type Cip56Metadata,
   type Cip56PartyConfig,
   type Cip56Transfer,
+  type Cip56TransferSmokeOptions,
+  type Cip56TransferSmokeResult,
   type LedgerCreateCommand,
   type LedgerExerciseCommand,
+  type TransferInstructionResultParsed,
 } from './cip56';

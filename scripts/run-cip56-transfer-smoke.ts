@@ -48,10 +48,11 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  console.log('Running CIP-56 / CIP-112 transfer integration skeleton...');
+  console.log('Running CIP-56 / CIP-112 transfer smoke against LocalNet...');
   run('npx', [
     'jest',
     '--runInBand',
+    '--testTimeout=300000',
     '--testMatch',
     '**/test/integration/localnet/cip56-transfer.test.ts',
     join('test', 'integration', 'localnet', 'cip56-transfer.test.ts'),

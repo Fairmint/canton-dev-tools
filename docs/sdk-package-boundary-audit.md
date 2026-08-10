@@ -43,9 +43,11 @@ Related work:
 ### `@fairmint/canton-fairmint-sdk`
 
 - `files`: `["dist"]` — after `tsc`, **494 files / ~0.91 MB**; no `bin`
-- LocalNet: `package.json#config` pins + `localnet*` scripts invoke `canton-localnet` from the node-sdk toolchain (not packaged)
+- LocalNet: `package.json#config` pins + `localnet*` scripts (soft-migrated to invoke
+  `canton-dev-tools` via optionalDependency; not packaged)
 - No `.dar`, `libs/**`, Docker compose, or fixture trees in the tarball
-- Gap closed: added `scripts/check-package-artifacts.cjs` + CI step
+- Gap closed: added `scripts/check-package-artifacts.cjs` + CI step (PR #196)
+- Soft migration: optional Dev Tools dependency + script switch (PR #197)
 
 ### `@open-captable-protocol/canton`
 

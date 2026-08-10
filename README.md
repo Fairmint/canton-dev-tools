@@ -63,6 +63,26 @@ npm run pack:check
 npm run fixture:splice-test-token-v2:fetch
 ```
 
+### CIP-56 / CIP-112 LocalNet transfer smoke
+
+Uses Splice `splice-test-token-v2` only (not Fairmint EquityTokens). Requires a running LocalNet
+Ledger JSON API (`http://localhost:3975`).
+
+```bash
+# 1. Start LocalNet (first run can take 15+ minutes; free host :3000 if nginx conflicts)
+npm run localnet:start
+
+# 2. Fetch the gitignored TestTokenV2 DAR (SHA-verified) and run the smoke
+npm run localnet:cip56-transfer
+
+# 3. Tear down when finished
+npm run localnet:teardown
+```
+
+`localnet:cip56-transfer` fails closed when Ledger is unreachable. The integration test under
+`test/integration/localnet/cip56-transfer.test.ts` skips those steps in ordinary `npm test`
+(no Docker) and exercises command builders + result parsers only.
+
 Internal fixtures (CI/scripts only; never published):
 
 - `fixtures/dar-lifecycle/` — minimal DAR lifecycle sources

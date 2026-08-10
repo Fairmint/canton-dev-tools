@@ -15,9 +15,12 @@ import {
   buildTransferFactoryTransferCommand,
   buildTransferInstructionAcceptCommand,
   encodeProviderLessExtraArgs,
+  parseTransferInstructionResult,
   providerLessAccount,
   providerLessAccountConfig,
   spliceTestTokenV2Instrument,
+  toCreateCommand,
+  toExerciseCommand,
 } from '../../../src/testing';
 
 const REPO_ROOT = resolve(__dirname, '../../..');
@@ -151,5 +154,47 @@ describe('CIP-56 / CIP-112 Splice TestTokenV2 helpers', (): void => {
     expect(accept.templateId).toBe(TRANSFER_INSTRUCTION_INTERFACE_ID);
     expect(accept.choice).toBe('TransferInstruction_Accept');
     expect(accept.choiceArgument['actors']).toEqual(['Bob::party']);
+  });
+
+  it('parses TransferInstructionResult JSON and wraps ledger commands', (): void => {
+    expect(
+      parseTransferInstructionResult({
+        output: {
+          tag: 'TransferInstructionResult_Completed',
+          value: { receiverHoldingCids: ['h1'] },
+        },
+        senderChangeCids: [],
+        meta: { values: {} },
+      })
+    ).toEqual({ type: 'Completed', receiverHoldingCids: ['h1'] });
+
+    expect(
+      parseTransferInstructionResult({
+        output: { tag: 'TransferInstructionResult_Pending', value: 'cid-direct' },
+        senderChangeCids: [],
+        meta: { values: {} },
+      })
+    ).toEqual({ type: 'Pending', transferInstructionCid: 'cid-direct' });
+
+    const create = buildTokenRulesCreateCommand({ admin: 'Admin::party' });
+    expect(toCreateCommand(create)).toEqual({
+      CreateCommand: {
+        templateId: TOKEN_RULES_TEMPLATE_ID,
+        createArguments: { admin: 'Admin::party' },
+      },
+    });
+
+    const accept = buildTransferInstructionAcceptCommand({
+      transferInstructionContractId: 'cid-instr',
+      actors: ['Bob::party'],
+    });
+    expect(toExerciseCommand(accept)).toEqual({
+      ExerciseCommand: {
+        templateId: TRANSFER_INSTRUCTION_INTERFACE_ID,
+        contractId: 'cid-instr',
+        choice: 'TransferInstruction_Accept',
+        choiceArgument: accept.choiceArgument,
+      },
+    });
   });
 });

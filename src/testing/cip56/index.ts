@@ -52,3 +52,14 @@ export {
   type LedgerCreateCommand,
   type LedgerExerciseCommand,
 } from './commands';
+
+export {
+  parseTransferInstructionResult,
+  runCip56TransferSmoke,
+  toCreateCommand,
+  toExerciseCommand,
+  SPLICE_TEST_TOKEN_V2_INSTRUMENT_DECIMALS,
+  type Cip56TransferSmokeOptions,
+  type Cip56TransferSmokeResult,
+  type TransferInstructionResultParsed,
+} from './transferSmoke';

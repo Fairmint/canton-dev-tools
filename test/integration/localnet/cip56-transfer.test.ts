@@ -5,15 +5,15 @@
  *   1. fetch      — `npm run fixture:splice-test-token-v2:fetch`
  *   2. validate   — assert DAR SHA-256 + package id constants
  *   3. upload/vet — LOCALNET: upload DAR to Ledger JSON API + vet packages
- *   4. parties    — LOCALNET: allocate admin / alice / bob
+ *   4. parties    — LOCALNET: allocate admin / alice / bob (createParty amount 0)
  *   5. TokenRules — create TokenRules for admin
  *   6. mint       — TokenRules_OfferMint + TransferInstruction_Accept (receiver)
  *   7. transfer   — TransferFactory_Transfer (V2) + TransferInstruction_Accept
- *   8. assert     — LOCALNET: receiver holdings / balances
+ *   8. assert     — LOCALNET: receiver holdings / balances via listTokenStandardV2Holdings
  *
- * This file implements unit-testable steps without LocalNet and leaves ledger-
- * dependent steps clearly marked. When Ledger is unreachable on :3975 the suite
- * skips (unit CI) rather than fail; `npm run localnet:cip56-transfer` fails closed.
+ * Unit-safe steps run without LocalNet. When Ledger is unreachable on :3975 the suite
+ * skips (unit CI) rather than fail; `npm run localnet:cip56-transfer` fails closed via
+ * `CANTON_CIP56_REQUIRE_LOCALNET=1`.
  */
 
 import {
@@ -25,8 +25,12 @@ import {
   buildTransferInstructionAcceptCommand,
   encodeProviderLessExtraArgs,
   isSpliceTestTokenV2DarPresent,
+  parseTransferInstructionResult,
   providerLessAccount,
+  runCip56TransferSmoke,
   spliceTestTokenV2Instrument,
+  toCreateCommand,
+  toExerciseCommand,
 } from '../../../src/testing';
 
 const LEDGER_URL = process.env['FAIRMINT_TEST_LEDGER_API_URL'] ?? 'http://localhost:3975';
@@ -46,7 +50,6 @@ async function isLedgerReachable(): Promise<boolean> {
 
 describe('CIP-56 / CIP-112 Splice TestTokenV2 LocalNet transfer', (): void => {
   it('validates fixture constants and command builders without LocalNet', (): void => {
-    // Step 2 (validate) — no ledger required.
     expect(SPLICE_TEST_TOKEN_V2_SHA256).toHaveLength(64);
     expect(SPLICE_TEST_TOKEN_V2_PACKAGE_ID).toHaveLength(64);
 
@@ -82,9 +85,28 @@ describe('CIP-56 / CIP-112 Splice TestTokenV2 LocalNet transfer', (): void => {
       amount: '10.0',
     });
     expect(accept.choice).toBe('TransferInstruction_Accept');
+
+    expect(toCreateCommand(create)).toEqual({
+      CreateCommand: {
+        templateId: create.templateId,
+        createArguments: create.createArgument,
+      },
+    });
+    expect(toExerciseCommand(accept).ExerciseCommand?.choice).toBe('TransferInstruction_Accept');
+
+    expect(
+      parseTransferInstructionResult({
+        output: {
+          tag: 'TransferInstructionResult_Pending',
+          value: { transferInstructionCid: 'cid-pending' },
+        },
+        senderChangeCids: [],
+        meta: { values: {} },
+      })
+    ).toEqual({ type: 'Pending', transferInstructionCid: 'cid-pending' });
   });
 
-  it('skips LocalNet-dependent steps when Ledger is down (or runs when required)', async (): Promise<void> => {
+  it('runs upload/vet/parties/mint/transfer/assert against LocalNet when Ledger is up', async (): Promise<void> => {
     const reachable = await isLedgerReachable();
 
     if (!reachable) {
@@ -99,18 +121,17 @@ describe('CIP-56 / CIP-112 Splice TestTokenV2 LocalNet transfer', (): void => {
       return;
     }
 
-    // LOCALNET-ONLY (steps 3–8):
-    // - Assert fixture DAR is on disk (fetch step should have run).
     expect(isSpliceTestTokenV2DarPresent(PACKAGE_ROOT)).toBe(true);
 
-    // TODO(ENG-1635): wire LedgerJsonApiClient from @fairmint/canton-node-sdk:
-    //   uploadDar(fixtures/.../splice-test-token-v2-1.0.0.dar)
-    //   vet packages → assert package id === SPLICE_TEST_TOKEN_V2_PACKAGE_ID
-    //   allocate parties admin/alice/bob
-    //   submit buildTokenRulesCreateCommand
-    //   OfferMint → Accept (mint)
-    //   TransferFactory_Transfer → TransferInstruction_Accept
-    //   assert bob holdings for instrument X2
-    expect(SPLICE_TEST_TOKEN_V2_PACKAGE_ID).toBeTruthy();
-  });
+    const result = await runCip56TransferSmoke({ packageRoot: PACKAGE_ROOT });
+
+    expect(result.adminPartyId.length).toBeGreaterThan(0);
+    expect(result.alicePartyId.length).toBeGreaterThan(0);
+    expect(result.bobPartyId.length).toBeGreaterThan(0);
+    expect(result.tokenRulesContractId.length).toBeGreaterThan(0);
+    expect(result.aliceBalance).toBe('40.0');
+    expect(result.bobBalance).toBe('10.0');
+    expect(result.mintOfferContractId.length).toBeGreaterThan(0);
+    expect(result.transferInstructionContractId.length).toBeGreaterThan(0);
+  }, 300_000);
 });
