@@ -9,8 +9,8 @@ export const SPLICE_TEST_TOKEN_V2_DAR_FILENAME = 'splice-test-token-v2-1.0.0.dar
 export const SPLICE_TEST_TOKEN_V2_UPSTREAM_PATH = `daml/dars/${SPLICE_TEST_TOKEN_V2_DAR_FILENAME}`;
 
 /**
- * SHA-256 of `splice-test-token-v2-1.0.0.dar` at Splice `0.6.11`
- * (`fd93f86ac42ce3a08985dcd0baae530b4f235f60`).
+ * SHA-256 of `splice-test-token-v2-1.0.0.dar` at Splice `0.6.14`
+ * (unchanged from `0.6.11`; `fd93f86ac42ce3a08985dcd0baae530b4f235f60` era).
  */
 export const SPLICE_TEST_TOKEN_V2_SHA256 =
   '43fcf2fcf4e84861501a0c00e8550e2863e1aad553b1fb772ee8aa7bca7fd245';

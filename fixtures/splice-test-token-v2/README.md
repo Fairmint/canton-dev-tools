@@ -12,7 +12,7 @@ holdings and CIP-112 transfer-instruction smoke tests.
 | Field         | Value                                                                       |
 | ------------- | --------------------------------------------------------------------------- |
 | Upstream repo | `https://github.com/canton-network/splice`                                  |
-| Ref           | `package.json#config.localnet_splice_version` (currently `0.6.11`)          |
+| Ref           | `package.json#config.localnet_splice_version` (currently `0.6.14`)          |
 | Upstream path | `daml/dars/splice-test-token-v2-1.0.0.dar`                                  |
 | Local path    | `fixtures/splice-test-token-v2/splice-test-token-v2-1.0.0.dar` (gitignored) |
 | SHA-256       | `43fcf2fcf4e84861501a0c00e8550e2863e1aad553b1fb772ee8aa7bca7fd245`          |

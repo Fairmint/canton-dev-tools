@@ -21,6 +21,7 @@ import {
   TRANSFER_FACTORY_INTERFACE_ID,
   TRANSFER_INSTRUCTION_INTERFACE_ID,
 } from './ids';
+import { formatDamlNumeric } from './numeric';
 
 export interface LedgerCreateCommand {
   templateId: string;
@@ -76,7 +77,7 @@ export function buildTokenRulesOfferMintCommand(
     choice: 'TokenRules_OfferMint',
     choiceArgument: {
       receiver: receiverAccount,
-      amount: String(params.amount),
+      amount: formatDamlNumeric(params.amount),
       instrumentId,
       offeredAt: params.offeredAt,
       receiverConfig:
@@ -121,7 +122,7 @@ export function buildTransferFactoryTransferCommand(
   const transfer: Cip56Transfer = {
     sender: providerLessAccount(params.sender),
     receiver: providerLessAccount(params.receiver),
-    amount: String(params.amount),
+    amount: formatDamlNumeric(params.amount),
     instrumentId: {
       admin: params.admin,
       id: params.instrumentId ?? SPLICE_TEST_TOKEN_V2_INSTRUMENT_ID,

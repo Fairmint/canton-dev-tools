@@ -1,8 +1,14 @@
 name: LocalNet Smoke
 
-# Nightly / manual LocalNet lifecycle smoke. Not required on every PR in ENG-1635.
-# Requires Docker on the runner. CIP-56 / CIP-112 transfer uses Splice TestTokenV2
-# (not a Fairmint token).
+# LocalNet lifecycle + CIP-56 transfer smoke. Intended to become a required PR check
+# once Docker image caching is finalized (TODO(ENG-1635)).
+#
+# Tradeoff vs nightly-only: first-run image pulls dominate wall time (~10–15m) and need
+# Docker/Compose + disk on the runner. We still run on pull_request so LocalNet regressions
+# block merges; keep workflow_dispatch for manual re-runs. No scheduled job — PR coverage is
+# the regression gate.
+#
+# Uses Splice TestTokenV2 (not a Fairmint token).
 #
 # Docker readiness notes:
 # - The ubuntu-latest runner usually has Docker available via the Actions service, but LocalNet
@@ -15,9 +21,8 @@ name: LocalNet Smoke
 #   `docker rm -f nginx`.
 
 on:
+  pull_request:
   workflow_dispatch:
-  schedule:
-    - cron: '0 6 * * *'
 
 permissions:
   contents: read
@@ -25,7 +30,8 @@ permissions:
 jobs:
   localnet-smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # Image pulls + DSO bootstrap + CIP-56 transfer routinely exceed 15m on a cold runner.
+    timeout-minutes: 45
 
     steps:
       - name: Checkout repository

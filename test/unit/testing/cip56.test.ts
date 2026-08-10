@@ -15,6 +15,7 @@ import {
   buildTransferFactoryTransferCommand,
   buildTransferInstructionAcceptCommand,
   encodeProviderLessExtraArgs,
+  formatDamlNumeric,
   parseTransferInstructionResult,
   providerLessAccount,
   providerLessAccountConfig,
@@ -129,6 +130,18 @@ describe('CIP-56 / CIP-112 Splice TestTokenV2 helpers', (): void => {
       id: 'X2',
     });
     expect(mint.choiceArgument['receiver']).toEqual(providerLessAccount('Alice::party'));
+    expect(mint.choiceArgument['amount']).toBe('100');
+
+    const tinyMint = buildTokenRulesOfferMintCommand({
+      tokenRulesContractId: 'cid-rules',
+      admin: 'Admin::party',
+      receiver: 'Alice::party',
+      amount: 0.0000001,
+      offeredAt: '2026-01-01T00:00:00Z',
+    });
+    expect(tinyMint.choiceArgument['amount']).toBe('0.0000001');
+    expect(formatDamlNumeric(0.0000001)).toBe('0.0000001');
+    expect(formatDamlNumeric('1.2500000000')).toBe('1.25');
 
     const transfer = buildTransferFactoryTransferCommand({
       transferFactoryContractId: 'cid-rules',
@@ -146,6 +159,19 @@ describe('CIP-56 / CIP-112 Splice TestTokenV2 helpers', (): void => {
     expect(transfer.choiceArgument['actors']).toEqual(['Alice::party']);
     expect((transfer.choiceArgument['transfer'] as { amount: string }).amount).toBe('10');
 
+    const fractionalTransfer = buildTransferFactoryTransferCommand({
+      transferFactoryContractId: 'cid-rules',
+      admin: 'Admin::party',
+      sender: 'Alice::party',
+      receiver: 'Bob::party',
+      amount: '0.5',
+      inputHoldingCids: ['cid-holding-1'],
+      requestedAt: '2026-01-01T00:00:00Z',
+      executeBefore: '2026-01-08T00:00:00Z',
+    });
+    expect((fractionalTransfer.choiceArgument['transfer'] as { amount: string }).amount).toBe(
+      '0.5'
+    );
     const accept = buildTransferInstructionAcceptCommand({
       transferInstructionContractId: 'cid-instr',
       actors: ['Bob::party'],

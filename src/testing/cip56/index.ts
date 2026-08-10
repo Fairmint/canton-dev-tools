@@ -54,11 +54,19 @@ export {
 } from './commands';
 
 export {
+  formatDamlNumeric,
+  formatDamlNumericFromBaseUnits,
+  parseDamlNumericToBaseUnits,
+  SPLICE_TEST_TOKEN_V2_INSTRUMENT_DECIMALS,
+  subtractDamlNumeric,
+  sumDamlNumeric,
+} from './numeric';
+
+export {
   parseTransferInstructionResult,
   runCip56TransferSmoke,
   toCreateCommand,
   toExerciseCommand,
-  SPLICE_TEST_TOKEN_V2_INSTRUMENT_DECIMALS,
   type Cip56TransferSmokeOptions,
   type Cip56TransferSmokeResult,
   type TransferInstructionResultParsed,

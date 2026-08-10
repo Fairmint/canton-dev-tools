@@ -21,8 +21,8 @@
   "config": {
     "localnet_protocol_version": "35",
     "localnet_quickstart_ref": "2f4edfc17621a7dfb6d44357050c22f4b3914c89",
-    "localnet_scribe_version": "0.6.11",
-    "localnet_splice_version": "0.6.11"
+    "localnet_scribe_version": "0.6.14",
+    "localnet_splice_version": "0.6.14"
   },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

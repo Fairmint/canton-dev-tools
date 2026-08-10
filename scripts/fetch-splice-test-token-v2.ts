@@ -3,7 +3,7 @@
 /**
  * Sparse-fetch Splice `splice-test-token-v2-1.0.0.dar` into fixtures/ (gitignored).
  *
- * Ref defaults to package.json config.localnet_splice_version (0.6.11).
+ * Ref defaults to package.json config.localnet_splice_version (0.6.14).
  * Pattern mirrors Fairmint/daml scripts/sync-splice-dars.ts.
  */
 

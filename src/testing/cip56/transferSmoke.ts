@@ -48,9 +48,14 @@ import {
   TOKEN_RULES_TEMPLATE_ID,
   TOKEN_TRANSFER_OFFER_TEMPLATE_ID,
 } from './ids';
+import {
+  formatDamlNumeric,
+  SPLICE_TEST_TOKEN_V2_INSTRUMENT_DECIMALS,
+  subtractDamlNumeric,
+  sumDamlNumeric,
+} from './numeric';
 
-/** Instrument decimals for holdings base-unit conversion (DAML Decimal precision). */
-export const SPLICE_TEST_TOKEN_V2_INSTRUMENT_DECIMALS = 10;
+export { SPLICE_TEST_TOKEN_V2_INSTRUMENT_DECIMALS };
 
 const DEFAULT_MINT_AMOUNT = '50.0';
 const DEFAULT_TRANSFER_AMOUNT = '10.0';
@@ -165,14 +170,6 @@ export function parseTransferInstructionResult(
   throw new Error(`Unknown TransferInstructionResult tag: ${tag}`);
 }
 
-function sumHoldingAmounts(amounts: readonly string[]): number {
-  return amounts.reduce((total, amount) => total + Number.parseFloat(amount), 0);
-}
-
-function formatDecimal(value: number): string {
-  return value.toFixed(1);
-}
-
 function daysFromNowIso(days: number, fromMs: number = Date.now()): string {
   return new Date(fromMs + days * 24 * 60 * 60 * 1000).toISOString();
 }
@@ -214,7 +211,7 @@ async function listUnlockedHoldings(
     partyId: string;
     adminPartyId: string;
   }
-): Promise<{ contractIds: string[]; amounts: string[]; total: number }> {
+): Promise<{ contractIds: string[]; amounts: string[]; total: string }> {
   const holdings = await listTokenStandardV2Holdings({
     ledger,
     parties: [params.partyId],
@@ -229,7 +226,7 @@ async function listUnlockedHoldings(
   const unlocked = holdings.filter((holding) => holding.lock === null);
   const contractIds = unlocked.map((holding) => holding.contractId);
   const amounts = unlocked.map((holding) => holding.amount);
-  return { contractIds, amounts, total: sumHoldingAmounts(amounts) };
+  return { contractIds, amounts, total: sumDamlNumeric(amounts) };
 }
 
 /**
@@ -241,8 +238,8 @@ export async function runCip56TransferSmoke(
   options: Cip56TransferSmokeOptions = {}
 ): Promise<Cip56TransferSmokeResult> {
   const packageRoot = options.packageRoot ?? process.cwd();
-  const mintAmount = options.mintAmount ?? DEFAULT_MINT_AMOUNT;
-  const transferAmount = options.transferAmount ?? DEFAULT_TRANSFER_AMOUNT;
+  const mintAmount = formatDamlNumeric(options.mintAmount ?? DEFAULT_MINT_AMOUNT);
+  const transferAmount = formatDamlNumeric(options.transferAmount ?? DEFAULT_TRANSFER_AMOUNT);
   const darPath = spliceTestTokenV2DarPath(packageRoot);
 
   if (!isSpliceTestTokenV2DarPresent(packageRoot)) {
@@ -387,7 +384,7 @@ export async function runCip56TransferSmoke(
     partyId: alicePartyId,
     adminPartyId,
   });
-  if (Math.abs(aliceAfterMint.total - Number.parseFloat(mintAmount)) > 1e-9) {
+  if (aliceAfterMint.total !== mintAmount) {
     throw new Error(
       `Alice balance after mint expected ${mintAmount}, got ${aliceAfterMint.total} (${aliceAfterMint.amounts.join(',')})`
     );
@@ -472,18 +469,16 @@ export async function runCip56TransferSmoke(
     adminPartyId,
   });
 
-  const expectedAlice = Number.parseFloat(mintAmount) - Number.parseFloat(transferAmount);
-  const expectedBob = Number.parseFloat(transferAmount);
+  const expectedAlice = subtractDamlNumeric(mintAmount, transferAmount);
+  const expectedBob = formatDamlNumeric(transferAmount);
 
-  if (Math.abs(aliceAfter.total - expectedAlice) > 1e-9) {
+  if (aliceAfter.total !== expectedAlice) {
     throw new Error(
-      `Alice balance after transfer expected ${formatDecimal(expectedAlice)}, got ${aliceAfter.total}`
+      `Alice balance after transfer expected ${expectedAlice}, got ${aliceAfter.total}`
     );
   }
-  if (Math.abs(bobAfter.total - expectedBob) > 1e-9) {
-    throw new Error(
-      `Bob balance after transfer expected ${formatDecimal(expectedBob)}, got ${bobAfter.total}`
-    );
+  if (bobAfter.total !== expectedBob) {
+    throw new Error(`Bob balance after transfer expected ${expectedBob}, got ${bobAfter.total}`);
   }
 
   return {
@@ -493,8 +488,8 @@ export async function runCip56TransferSmoke(
     tokenRulesContractId,
     mintAmount,
     transferAmount,
-    aliceBalance: formatDecimal(aliceAfter.total),
-    bobBalance: formatDecimal(bobAfter.total),
+    aliceBalance: aliceAfter.total,
+    bobBalance: bobAfter.total,
     mintOfferContractId,
     transferInstructionContractId,
   };
