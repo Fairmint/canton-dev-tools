@@ -181,7 +181,7 @@ ensure_quickstart_checkout() {
 
   if [[ ! -d "${tmp}/quickstart/docker/modules/localnet" ]]; then
     log "Fetched cn-quickstart does not contain quickstart/docker/modules/localnet."
-    exit 1
+    return 1
   fi
 
   mv "${tmp}" "${root}"
