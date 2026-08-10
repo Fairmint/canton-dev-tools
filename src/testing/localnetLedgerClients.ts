@@ -68,12 +68,15 @@ async function resolveRoleCheckedClient(
 /**
  * Resolve a Validator API client for LocalNet party onboarding (`createParty`).
  *
- * Tries shared-secret then OAuth2 app-provider runtimes, matching ledger client auth resolution.
+ * Prefers OAuth2 (package LocalNet default). Shared-secret is tried second for
+ * consumer CI that runs LocalNet without Keycloak; note that some validator
+ * admin endpoints only accept OAuth tokens even when getValidatorUserInfo works
+ * with a shared-secret JWT.
  */
 export async function getLocalnetValidatorClient(): Promise<ValidatorApiClient> {
   validatorClientPromise ??= resolveValidatorClient([
-    createSharedSecretValidatorClient('ledger-api-user'),
     createOAuthValidatorClient(),
+    createSharedSecretValidatorClient('ledger-api-user'),
   ]);
   return validatorClientPromise;
 }

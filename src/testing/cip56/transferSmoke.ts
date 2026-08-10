@@ -24,7 +24,6 @@ import {
   buildDisclosedContract,
   findCreatedContractId,
   findExerciseResult,
-  listCreatedEvents,
   type LedgerDisclosedContract,
 } from '../transactionHelpers';
 import {
@@ -43,7 +42,12 @@ import {
   SPLICE_TEST_TOKEN_V2_SHA256,
   spliceTestTokenV2DarPath,
 } from './fixture';
-import { HOLDING_INTERFACE_ID, SPLICE_TEST_TOKEN_V2_INSTRUMENT_ID } from './ids';
+import {
+  HOLDING_INTERFACE_ID,
+  SPLICE_TEST_TOKEN_V2_INSTRUMENT_ID,
+  TOKEN_RULES_TEMPLATE_ID,
+  TOKEN_TRANSFER_OFFER_TEMPLATE_ID,
+} from './ids';
 
 /** Instrument decimals for holdings base-unit conversion (DAML Decimal precision). */
 export const SPLICE_TEST_TOKEN_V2_INSTRUMENT_DECIMALS = 10;
@@ -310,14 +314,6 @@ export async function runCip56TransferSmoke(
     commands: [toCreateCommand(buildTokenRulesCreateCommand({ admin: adminPartyId }))],
   });
   const tokenRulesContractId = findCreatedContractId(createTree, 'TokenRules');
-  const tokenRulesCreated = listCreatedEvents(createTree).find((event) =>
-    event.templateId.includes('TokenRules')
-  );
-  if (!tokenRulesCreated) {
-    throw new Error('TokenRules create event missing after create');
-  }
-  const tokenRulesTemplateId = tokenRulesCreated.templateId;
-
   const tokenRulesEvents = await ledger.getEventsByContractId({
     contractId: tokenRulesContractId,
     readAs: [adminPartyId],
@@ -326,6 +322,8 @@ export async function runCip56TransferSmoke(
   if (!synchronizerId) {
     throw new Error(`Could not resolve synchronizerId for TokenRules ${tokenRulesContractId}`);
   }
+  // Prefer the package-name template id for ACS filters (Ledger rejects raw package-id refs).
+  const tokenRulesTemplateId = TOKEN_RULES_TEMPLATE_ID;
 
   const tokenRulesDisclosure = await discloseTokenRules(ledger, {
     tokenRulesContractId,
@@ -422,19 +420,29 @@ export async function runCip56TransferSmoke(
     ],
   });
 
-  const transferParsed = parseTransferInstructionResult(
-    findExerciseResult(transferTree, 'TransferFactory_Transfer')
-  );
+  const transferExerciseResult = findExerciseResult(transferTree, 'TransferFactory_Transfer');
+  const transferParsed = parseTransferInstructionResult(transferExerciseResult);
   if (transferParsed.type !== 'Pending' || !transferParsed.transferInstructionCid) {
     throw new Error(
-      `Expected TransferFactory_Transfer Pending instruction, got ${JSON.stringify(transferParsed)}`
+      `Expected TransferFactory_Transfer Pending instruction, got ${JSON.stringify(transferParsed)} ` +
+        `(raw=${JSON.stringify(transferExerciseResult)})`
     );
   }
   const transferInstructionContractId = transferParsed.transferInstructionCid;
 
+  // Disclose the pending offer + TokenRules. Also readAs alice so the instruction is
+  // visible on this participant even if bob's observer projection lags.
+  const pendingDisclosure = await buildDisclosedContract(ledger, {
+    contractId: transferInstructionContractId,
+    templateId: TOKEN_TRANSFER_OFFER_TEMPLATE_ID,
+    synchronizerId,
+    readAsParty: alicePartyId,
+  });
+
   const acceptTransferTree = await ledger.submitAndWaitForTransactionTree({
     actAs: [bobPartyId],
-    disclosedContracts: [tokenRulesDisclosure],
+    readAs: [alicePartyId, adminPartyId],
+    disclosedContracts: [tokenRulesDisclosure, pendingDisclosure],
     commands: [
       toExerciseCommand(
         buildTransferInstructionAcceptCommand({
