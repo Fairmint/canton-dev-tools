@@ -1,0 +1,45 @@
+import {
+  buildIntegrationTestClientConfig,
+  buildLocalnetClientConfig,
+  createSharedSecretJwt,
+  generateTestId,
+  findCreatedContractId,
+  listCreatedEvents,
+} from '../../../src/testing';
+
+describe('testing helpers', (): void => {
+  it('builds a localnet client config with SDK OAuth2 defaults', (): void => {
+    const config = buildLocalnetClientConfig();
+    expect(config.network).toBe('localnet');
+    expect(config.provider).toBe('app-provider');
+    expect(buildIntegrationTestClientConfig()).toEqual(config);
+  });
+
+  it('creates a shared-secret JWT and stable test ids', (): void => {
+    const token = createSharedSecretJwt({ subject: 'ledger-api-user' });
+    expect(token.split('.')).toHaveLength(3);
+    expect(generateTestId('demo')).toMatch(/^demo-\d+-[a-z0-9]+$/);
+  });
+
+  it('finds created contract ids from transaction trees', (): void => {
+    const tree = {
+      transactionTree: {
+        eventsById: {
+          '0': {
+            CreatedTreeEvent: {
+              value: {
+                contractId: 'cid-1',
+                templateId: '#Pkg:Mod:Holding',
+                createdEventBlob: 'blob',
+                createArgument: {},
+              },
+            },
+          },
+        },
+      },
+    };
+
+    expect(listCreatedEvents(tree)).toHaveLength(1);
+    expect(findCreatedContractId(tree, 'Holding')).toBe('cid-1');
+  });
+});

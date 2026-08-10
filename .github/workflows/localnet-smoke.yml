@@ -1,0 +1,46 @@
+name: LocalNet Smoke
+
+# Nightly / manual LocalNet lifecycle smoke. Not required on every PR in ENG-1635 PR1.
+# Requires Docker on the runner. Full Splice CIP-56 CI path lands in a later PR.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 6 * * *'
+
+permissions:
+  contents: read
+
+jobs:
+  localnet-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: npm ci
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      # TODO(ENG-1635): harden GH Actions Docker provisioning / image caching for LocalNet.
+      # This job is best-effort until the shared runner image and cache strategy are finalized.
+      - name: Start LocalNet
+        run: |
+          set -euo pipefail
+          npm run localnet:start
+
+      - name: Readiness
+        run: npm run localnet:readiness
+
+      - name: Teardown
+        if: always()
+        run: npm run localnet:teardown
