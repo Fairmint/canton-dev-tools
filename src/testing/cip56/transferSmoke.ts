@@ -15,7 +15,7 @@ import {
   type ValidatorApiClient,
 } from '@fairmint/canton-node-sdk';
 
-import { generateTestId } from '../testConfig';
+import { generateTestId, sleep } from '../testConfig';
 import {
   getLocalnetParticipantAdminLedgerClient,
   getLocalnetValidatorClient,
@@ -229,6 +229,78 @@ async function listUnlockedHoldings(
   return { contractIds, amounts, total: sumDamlNumeric(amounts) };
 }
 
+/** Collect messages from an error and its nested `cause` chain. */
+export function collectErrorMessages(err: unknown, depth = 5): string {
+  const parts: string[] = [];
+  let current: unknown = err;
+  for (let i = 0; i < depth && current !== undefined && current !== null; i += 1) {
+    if (current instanceof Error) {
+      parts.push(current.message);
+      current = 'cause' in current ? (current as { cause?: unknown }).cause : undefined;
+      continue;
+    }
+    parts.push(String(current));
+    break;
+  }
+  return parts.join('\n');
+}
+
+/**
+ * LocalNet Validator may return HTTP 429 while traffic balance is still below the
+ * reserved amount (`0 < 200000`). That is transient until auto top-up lands.
+ */
+export function isTransientValidatorTrafficError(err: unknown): boolean {
+  const text = collectErrorMessages(err);
+  return (
+    /\bHTTP 429\b/i.test(text) ||
+    /Too Many Requests/i.test(text) ||
+    /Traffic balance below reserved traffic amount/i.test(text)
+  );
+}
+
+async function createPartyAfterTrafficReady(params: {
+  ledger: LedgerJsonApiClient;
+  validator: ValidatorApiClient;
+  partyName: string;
+  timeoutMs?: number;
+  pollIntervalMs?: number;
+}): Promise<{ partyId: string }> {
+  const timeoutMs = params.timeoutMs ?? 180_000;
+  const pollIntervalMs = params.pollIntervalMs ?? 10_000;
+  const deadline = Date.now() + timeoutMs;
+  let lastError: Error | undefined;
+  let attempt = 0;
+
+  while (Date.now() < deadline) {
+    attempt += 1;
+    // Fresh party prefix per attempt so a partial createUser cannot collide on retry.
+    const partyName = attempt === 1 ? params.partyName : `${params.partyName}-r${attempt}`;
+    try {
+      return await createParty({
+        ledgerClient: params.ledger,
+        validatorClient: params.validator,
+        partyName,
+        amount: '0',
+      });
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      if (!isTransientValidatorTrafficError(err)) {
+        throw lastError;
+      }
+      const remainingMs = deadline - Date.now();
+      if (remainingMs <= 0) {
+        break;
+      }
+      await sleep(Math.min(pollIntervalMs, remainingMs));
+    }
+  }
+
+  throw new Error(
+    `Timed out waiting for Validator traffic before createParty(${params.partyName})` +
+      (lastError ? `: ${lastError.message}` : '')
+  );
+}
+
 /**
  * Run the full Splice TestTokenV2 CIP-56 / CIP-112 LocalNet transfer smoke.
  *
@@ -281,25 +353,23 @@ export async function runCip56TransferSmoke(
     );
   }
 
-  // 4. parties (amount 0 — identity only, no amulet funding)
+  // 4. parties (amount 0 — identity only, no amulet funding).
+  // Retry through transient Validator traffic-balance 429s after LocalNet bootstrap.
   const runId = generateTestId('cip56');
-  const { partyId: adminPartyId } = await createParty({
-    ledgerClient: ledger,
-    validatorClient: validator,
+  const { partyId: adminPartyId } = await createPartyAfterTrafficReady({
+    ledger,
+    validator,
     partyName: `${runId}-admin`,
-    amount: '0',
   });
-  const { partyId: alicePartyId } = await createParty({
-    ledgerClient: ledger,
-    validatorClient: validator,
+  const { partyId: alicePartyId } = await createPartyAfterTrafficReady({
+    ledger,
+    validator,
     partyName: `${runId}-alice`,
-    amount: '0',
   });
-  const { partyId: bobPartyId } = await createParty({
-    ledgerClient: ledger,
-    validatorClient: validator,
+  const { partyId: bobPartyId } = await createPartyAfterTrafficReady({
+    ledger,
+    validator,
     partyName: `${runId}-bob`,
-    amount: '0',
   });
 
   await grantActAsRights(ledger, [adminPartyId, alicePartyId, bobPartyId]);
