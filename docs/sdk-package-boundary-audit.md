@@ -11,16 +11,22 @@ Related work:
   https://github.com/Fairmint/canton-dev-tools/pull/1
 - `@fairmint/canton-node-sdk` soft-migration PR:
   https://github.com/Fairmint/canton-node-sdk/pull/398
+- `@fairmint/canton-fairmint-sdk` pack guard PR:
+  https://github.com/Fairmint/canton-fairmint-sdk/pull/196
+- `@fairmint/canton-fairmint-sdk` soft-migration PR:
+  https://github.com/Fairmint/canton-fairmint-sdk/pull/197
+- `@open-captable-protocol/canton` pack guard PR:
+  https://github.com/Fairmint/ocp-canton-sdk/pull/451
 
 ## Summary
 
-| Package | Publishes? | Pack guard | Ships LocalNet CLI? | Ships `.dar` / `libs/**` / fixtures? | Verdict |
-| --- | --- | --- | --- | --- | --- |
-| `@fairmint/canton-node-sdk` | public npm | `check:package-artifacts` (CI) | **Yes** (`bin/canton-localnet`, `scripts/localnet-cloud.sh`) — soft migration | No | Acceptable temporary exception; harden `files` to `build/src/**` |
-| `@fairmint/canton-fairmint-sdk` | restricted npm | **added** (`check:package-artifacts`) | No (npm scripts only; CLI via node-sdk / Dev Tools) | No | Clean runtime `dist/**`; add repeatable pack guard |
-| `@open-captable-protocol/canton` | public npm | **added** (`check:package-artifacts`) | No (npm scripts only) | No (`libs/**` not in `files`) | Clean runtime `dist/**` (+ intentional `dist/ocf-schema`); add pack guard |
-| `@fairmint/canton-privy-sdk` | restricted npm | `pack:check` + `smoke:package` + entry-boundary check | No | No | Clean; no LocalNet surface |
-| `@fairmint/canton-dev-tools` | intended public (ENG-1635) | `check:package-artifacts` | **Yes** (canonical owner) | No (fixtures stay repo-local) | Intended LocalNet home |
+| Package                          | Publishes?                 | Pack guard                                            | Ships LocalNet CLI?                                                           | Ships `.dar` / `libs/**` / fixtures? | Verdict                                                                   |
+| -------------------------------- | -------------------------- | ----------------------------------------------------- | ----------------------------------------------------------------------------- | ------------------------------------ | ------------------------------------------------------------------------- |
+| `@fairmint/canton-node-sdk`      | public npm                 | `check:package-artifacts` (CI)                        | **Yes** (`bin/canton-localnet`, `scripts/localnet-cloud.sh`) — soft migration | No                                   | Acceptable temporary exception; harden `files` to `build/src/**`          |
+| `@fairmint/canton-fairmint-sdk`  | restricted npm             | **added** (`check:package-artifacts`)                 | No (npm scripts only; CLI via node-sdk / Dev Tools)                           | No                                   | Clean runtime `dist/**`; add repeatable pack guard                        |
+| `@open-captable-protocol/canton` | public npm                 | **added** (`check:package-artifacts`)                 | No (npm scripts only)                                                         | No (`libs/**` not in `files`)        | Clean runtime `dist/**` (+ intentional `dist/ocf-schema`); add pack guard |
+| `@fairmint/canton-privy-sdk`     | restricted npm             | `pack:check` + `smoke:package` + entry-boundary check | No                                                                            | No                                   | Clean; no LocalNet surface                                                |
+| `@fairmint/canton-dev-tools`     | intended public (ENG-1635) | `check:package-artifacts`                             | **Yes** (canonical owner)                                                     | No (fixtures stay repo-local)        | Intended LocalNet home                                                    |
 
 ## Per-package findings
 
