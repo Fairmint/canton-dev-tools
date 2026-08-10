@@ -45,8 +45,12 @@ import {
   buildLocalnetClientConfig,
   getLocalnetParticipantAdminLedgerClient,
   findCreatedContractId,
+  buildTransferFactoryTransferCommand,
+  SPLICE_TEST_TOKEN_V2_SHA256,
 } from '@fairmint/canton-dev-tools/testing';
 ```
+
+CIP-56 / CIP-112 helpers target the Splice `splice-test-token-v2` reference DAR (not Fairmint EquityTokens).
 
 ## Development
 
@@ -55,6 +59,10 @@ npm install
 npm run build
 npm test
 npm run pack:check
+npm run fixture:splice-test-token-v2:fetch
 ```
 
-Internal DAR lifecycle fixture sources live under `fixtures/dar-lifecycle/` (CI/scripts only; never published).
+Internal fixtures (CI/scripts only; never published):
+
+- `fixtures/dar-lifecycle/` — minimal DAR lifecycle sources
+- `fixtures/splice-test-token-v2/` — Splice TestTokenV2 DAR (gitignored binary; fetch via npm script)

@@ -1,7 +1,8 @@
 name: LocalNet Smoke
 
 # Nightly / manual LocalNet lifecycle smoke. Not required on every PR in ENG-1635.
-# Requires Docker on the runner. Full Splice CIP-56 / CIP-112 CI path lands in a later PR.
+# Requires Docker on the runner. CIP-56 / CIP-112 transfer uses Splice TestTokenV2
+# (not a Fairmint token).
 #
 # Docker readiness notes:
 # - The ubuntu-latest runner usually has Docker available via the Actions service, but LocalNet
@@ -41,6 +42,9 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
+      - name: Fetch Splice TestTokenV2 fixture DAR
+        run: npm run fixture:splice-test-token-v2:fetch
+
       # TODO(ENG-1635): harden GH Actions Docker provisioning / image caching for LocalNet.
       # This job is best-effort until the shared runner image and cache strategy are finalized.
       - name: Start LocalNet
@@ -53,16 +57,13 @@ jobs:
         id: localnet-readiness
         run: npm run localnet:readiness
 
-      # TODO(ENG-1635 / CIP-56 / CIP-112): add a transfer integration step against LocalNet.
-      # Do NOT invent a Fairmint token for this. Use the Splice reference fixture / cn-quickstart
-      # LocalNet transfer paths (CIP-56 holdings + CIP-112 transfer instructions) once the shared
-      # LocalNet smoke is green and pin ownership is consumed by canton-node-sdk.
-      # Example outline (commented until the fixture + auth wiring land):
-      # - name: CIP-56 / CIP-112 transfer smoke (Splice reference fixture)
-      #   run: |
-      #     set -euo pipefail
-      #     # npm run localnet:cip56-transfer  # TBD: invoke Splice reference transfer helpers
-      #     echo "TODO: exercise CIP-56 holdings + CIP-112 transfer via Splice reference fixture"
+      # Prefer a real step with clear failure when LocalNet / Docker is not ready.
+      # Do NOT invent a Fairmint token — uses fixtures/splice-test-token-v2 (CIP-112 capable).
+      - name: CIP-56 / CIP-112 transfer smoke (Splice TestTokenV2)
+        id: cip56-transfer
+        run: |
+          set -euo pipefail
+          npm run localnet:cip56-transfer
 
       - name: Diagnostics on failure
         if: failure()

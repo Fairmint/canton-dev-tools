@@ -42,6 +42,12 @@ describe('package artifact policy', (): void => {
     expect(
       forbiddenPackagePathReason('fixtures/dar-lifecycle/.daml/dist/DarLifecycle-0.0.1.dar')
     ).toMatch(/DAR/);
+    expect(
+      forbiddenPackagePathReason('fixtures/splice-test-token-v2/splice-test-token-v2-1.0.0.dar')
+    ).toMatch(/DAR/);
+    expect(forbiddenPackagePathReason('fixtures/splice-test-token-v2/README.md')).toMatch(
+      /fixtures/
+    );
     expect(forbiddenPackagePathReason('internal/daml-fixture/daml.yaml')).toMatch(/internal/);
     expect(forbiddenPackagePathReason('artifact.dar')).toMatch(/DAR/);
     expect(forbiddenPackagePathReason('bin/canton-dev-tools')).toBeNull();

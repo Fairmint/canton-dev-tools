@@ -61,6 +61,8 @@
     "localnet:start": "npm run -s localnet -- start",
     "localnet:teardown": "npm run -s localnet -- teardown",
     "fixture:dar-lifecycle:build": "bash scripts/build-dar-lifecycle-fixture.sh",
+    "fixture:splice-test-token-v2:fetch": "tsx scripts/fetch-splice-test-token-v2.ts",
+    "localnet:cip56-transfer": "CANTON_CIP56_REQUIRE_LOCALNET=1 tsx scripts/run-cip56-transfer-smoke.ts",
     "pack:check": "npm run check:package-artifacts",
     "prepack": "npm run clean && npm run build",
     "prepublishOnly": "npm run prepack",
