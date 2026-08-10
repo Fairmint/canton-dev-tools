@@ -52,6 +52,19 @@ import {
 
 CIP-56 / CIP-112 helpers target the Splice `splice-test-token-v2` reference DAR.
 
+## Publishing
+
+Every push/merge to `main` runs [`.github/workflows/publish.yml`](./.github/workflows/publish.yml),
+which auto-publishes `@fairmint/canton-dev-tools` to npm via **OIDC Trusted Publishing** (no
+`NPM_TOKEN` on the publish step).
+
+- **`package.json` version is a floor.** Intentional minor/major bumps: set a version higher than
+  npm's latest before merging; CI publishes that exact version.
+- **Routine patches auto-increment** from the higher of npm latest / existing tags.
+- Version rewrites happen in the CI workspace only — they are not committed back to `main`.
+- Before the first successful publish, a human must configure an npm Trusted Publisher for
+  `Fairmint/canton-dev-tools` → workflow `publish.yml` on the `@fairmint` org.
+
 ## Development
 
 ```bash
@@ -64,7 +77,7 @@ npm run fixture:splice-test-token-v2:fetch
 
 ### CIP-56 / CIP-112 LocalNet transfer smoke
 
-Uses Splice `splice-test-token-v2` only (not Fairmint EquityTokens). Requires a running LocalNet
+Uses Splice `splice-test-token-v2` only. Requires a running LocalNet
 Ledger JSON API (`http://localhost:3975`).
 
 ```bash
