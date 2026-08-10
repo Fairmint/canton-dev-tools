@@ -54,7 +54,7 @@
     "format:fix": "prettier --write .",
     "lint": "eslint . --max-warnings=0",
     "lint:fix": "eslint . --fix --max-warnings=0",
-    "localnet": "CANTON_LOCALNET_AUTH_MODE=oauth2 CANTON_LOCALNET_QUICKSTART_REF=$npm_package_config_localnet_quickstart_ref CANTON_LOCALNET_SPLICE_VERSION=$npm_package_config_localnet_splice_version CANTON_LOCALNET_SCRIBE_VERSION=$npm_package_config_localnet_scribe_version CANTON_LOCALNET_PROTOCOL_VERSION=$npm_package_config_localnet_protocol_version bash ./bin/canton-dev-tools",
+    "localnet": "bash ./bin/canton-dev-tools",
     "localnet:diagnostics": "npm run -s localnet -- diagnostics",
     "localnet:readiness": "npm run -s localnet -- readiness",
     "localnet:setup": "npm run -s localnet -- setup",

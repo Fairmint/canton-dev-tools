@@ -45,8 +45,16 @@ export function generateTestId(prefix: string): string {
 export function buildLocalnetClientConfig(): ClientConfig {
   const authUrl = getEnv('FAIRMINT_TEST_AUTH_URL');
   const network = (getEnv('FAIRMINT_TEST_NETWORK') ?? 'localnet') as ClientConfig['network'];
+  const ledgerApiUrl = getEnv('FAIRMINT_TEST_LEDGER_API_URL');
+  const validatorApiUrl = getEnv('FAIRMINT_TEST_VALIDATOR_API_URL');
+  const scanApiUrl = getEnv('FAIRMINT_TEST_SCAN_API_URL');
+  const hasAuthOverride =
+    Boolean(authUrl) ||
+    Boolean(getEnv('FAIRMINT_TEST_CLIENT_ID')) ||
+    Boolean(getEnv('FAIRMINT_TEST_SHARED_SECRET'));
+  const hasEndpointOverride = Boolean(ledgerApiUrl) || Boolean(validatorApiUrl) || Boolean(scanApiUrl);
 
-  if (!authUrl && !getEnv('FAIRMINT_TEST_CLIENT_ID') && !getEnv('FAIRMINT_TEST_SHARED_SECRET')) {
+  if (!hasAuthOverride && !hasEndpointOverride) {
     // SDK built-in LocalNet OAuth2 defaults (cn-quickstart option 2).
     return {
       network,
@@ -54,20 +62,22 @@ export function buildLocalnetClientConfig(): ClientConfig {
     };
   }
 
+  // URL-only overrides keep OAuth defaults via buildAuthConfig when authUrl is unset.
   return {
     network,
+    provider: 'app-provider',
     ...(authUrl ? { authUrl } : {}),
     apis: {
       LEDGER_JSON_API: {
-        apiUrl: getEnv('FAIRMINT_TEST_LEDGER_API_URL') ?? 'http://localhost:3975',
+        apiUrl: ledgerApiUrl ?? 'http://localhost:3975',
         auth: buildAuthConfig('LEDGER_JSON_API'),
       },
       VALIDATOR_API: {
-        apiUrl: getEnv('FAIRMINT_TEST_VALIDATOR_API_URL') ?? 'http://localhost:3903',
+        apiUrl: validatorApiUrl ?? 'http://localhost:3903',
         auth: buildAuthConfig('VALIDATOR_API'),
       },
       SCAN_API: {
-        apiUrl: getEnv('FAIRMINT_TEST_SCAN_API_URL') ?? 'http://localhost:4000',
+        apiUrl: scanApiUrl ?? 'http://localhost:4000',
         auth: buildAuthConfig('SCAN_API'),
       },
     },
@@ -128,7 +138,11 @@ export async function retry<T>(
       return await fn();
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
-      await sleep(pollIntervalMs);
+      const remainingMs = deadline - Date.now();
+      if (remainingMs <= 0) {
+        break;
+      }
+      await sleep(Math.min(pollIntervalMs, remainingMs));
     }
   }
 

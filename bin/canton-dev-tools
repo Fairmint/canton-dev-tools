@@ -238,6 +238,9 @@ main() {
     export CANTON_LOCALNET_QUICKSTART_DIR="${dir}"
   fi
   # Apply central pins for npx / direct binary invocations (not only npm scripts).
+  # Caller env overrides are preserved; package pins are defaults only.
+  export CANTON_LOCALNET_AUTH_MODE="${CANTON_LOCALNET_AUTH_MODE:-oauth2}"
+  export CANTON_LOCALNET_QUICKSTART_REF="${CANTON_LOCALNET_QUICKSTART_REF:-${DEFAULT_QUICKSTART_REF}}"
   export CANTON_LOCALNET_SPLICE_VERSION="${CANTON_LOCALNET_SPLICE_VERSION:-$(default_splice_version)}"
   export CANTON_LOCALNET_SCRIBE_VERSION="${CANTON_LOCALNET_SCRIBE_VERSION:-${DEFAULT_SCRIBE_VERSION}}"
   export CANTON_LOCALNET_PROTOCOL_VERSION="${CANTON_LOCALNET_PROTOCOL_VERSION:-${DEFAULT_PROTOCOL_VERSION}}"

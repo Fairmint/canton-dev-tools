@@ -2,10 +2,10 @@
 
 `@fairmint/canton-dev-tools` is the **central owner** of Fairmint's shared Canton LocalNet pin set.
 
-Consumers should prefer this package's `package.json#config` values (and matching CLI defaults in
-`bin/canton-dev-tools`) instead of maintaining divergent pins in individual SDKs. The CLI hardcodes
-all four defaults so `npx @fairmint/canton-dev-tools start` applies them without relying on npm
-script env wiring.
+Consumers should prefer this package's CLI defaults in `bin/canton-dev-tools` (kept in sync with
+`package.json#config` by `pack:check`) instead of maintaining divergent pins in individual SDKs.
+`npm run localnet*` delegates to the binary, which applies the four pins and oauth2 auth as
+defaults while preserving caller environment overrides.
 
 | Pin                     | Config key                  | Current value                              |
 | ----------------------- | --------------------------- | ------------------------------------------ |

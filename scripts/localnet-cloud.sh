@@ -23,7 +23,8 @@ log() {
 }
 
 is_truthy() {
-  case "${1,,}" in
+  # Portable lowercase (Bash 3.2+ / macOS /bin/bash); avoid ${1,,} (Bash 4+).
+  case "$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')" in
     1 | true | yes | on)
       return 0
       ;;
@@ -1034,7 +1035,8 @@ read_npm_script() {
 
 script_is_recursive_localnet_test() {
   local script_value="$1"
-  echo "${script_value}" | grep -Eq '(^|[[:space:]])(canton-(localnet|dev-tools)[[:space:]]+test|[^[:space:]]*localnet-cloud\.sh[[:space:]]+test)([[:space:]]|$)'
+  # Match bare binaries, scoped package npx, and direct script invocations.
+  echo "${script_value}" | grep -Eq '(^|[[:space:]])((npx[[:space:]]+)?@fairmint/canton-dev-tools[[:space:]]+test|canton-(localnet|dev-tools)[[:space:]]+test|[^[:space:]]*localnet-cloud\.sh[[:space:]]+test)([[:space:]]|$)'
 }
 
 run_integration_tests() {
