@@ -69,6 +69,16 @@ jobs:
       - name: Prepare release
         run: npm run prepare-release
 
+      # setup-node's registry-url writes `//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}`
+      # into the runner npmrc. With NODE_AUTH_TOKEN unset on this step that expands to empty and
+      # npm treats classic auth as configured, skipping the OIDC Trusted Publisher exchange.
+      - name: Clear classic npm auth for OIDC publish
+        run: |
+          npmrc="${NPM_CONFIG_USERCONFIG:-$HOME/.npmrc}"
+          if [[ -f "${npmrc}" ]]; then
+            sed -i '/_authToken/d' "${npmrc}"
+          fi
+
       # Publishes via npm Trusted Publisher (OIDC); do not set NODE_AUTH_TOKEN here.
       # Provenance is omitted: this repository may be private, and --provenance requires
       # a public source repo. OIDC trusted publishing still works without provenance.

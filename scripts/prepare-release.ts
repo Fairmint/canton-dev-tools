@@ -187,16 +187,12 @@ function prepareRelease(): void {
         encoding: 'utf8',
       }).trim();
     } catch {
-      console.log('No previous tag found, getting commits ahead of main branch');
-      try {
-        commits = execSync('git log --oneline --format="%s" main..HEAD', {
-          encoding: 'utf8',
-        }).trim();
-      } catch {
-        commits = execSync('git log --oneline --format="%s" -n 20', {
-          encoding: 'utf8',
-        }).trim();
-      }
+      // No previous tag (first publish on main): take recent history, not main..HEAD
+      // which is empty when HEAD is already on main.
+      console.log('No previous tag found, using recent commit history');
+      commits = execSync('git log --oneline --format="%s" -n 20', {
+        encoding: 'utf8',
+      }).trim();
     }
 
     if (!commits) {
