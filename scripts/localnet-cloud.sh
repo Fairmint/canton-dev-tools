@@ -363,7 +363,7 @@ patch_quickstart_canton_healthcheck() {
 
   cat >"${healthcheck}" <<'EOF'
 #!/bin/bash
-set -eou pipefail
+set -euo pipefail
 
 http_check() {
   local port="$1"
@@ -409,7 +409,7 @@ patch_quickstart_splice_healthcheck() {
 
   cat >"${healthcheck}" <<'EOF'
 #!/bin/bash
-set -eou pipefail
+set -euo pipefail
 
 http_check() {
   local port="$1"

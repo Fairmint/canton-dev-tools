@@ -119,6 +119,37 @@ start_localnet
     ]);
   });
 
+  it('writes Canton/Splice healthchecks with valid errexit/nounset/pipefail flags', (): void => {
+    const quickstart = mkdtempSync(resolve(tmpdir(), 'canton-localnet-healthcheck-'));
+    const localnet = resolve(quickstart, 'docker/modules/localnet');
+    const cantonHealthcheck = resolve(localnet, 'docker/canton/health-check.sh');
+    const spliceHealthcheck = resolve(localnet, 'docker/splice/health-check.sh');
+
+    mkdirSync(resolve(localnet, 'conf/canton'), { recursive: true });
+    mkdirSync(resolve(localnet, 'conf/splice/sv'), { recursive: true });
+    mkdirSync(resolve(localnet, 'docker/canton'), { recursive: true });
+    mkdirSync(resolve(localnet, 'docker/splice'), { recursive: true });
+    writeFileSync(resolve(localnet, 'conf/canton/app.conf'), 'canton {}\n');
+    writeFileSync(resolve(localnet, 'conf/splice/sv/app.conf'), 'canton {}\n');
+    writeFileSync(cantonHealthcheck, '#!/bin/bash\n');
+    writeFileSync(spliceHealthcheck, '#!/bin/bash\n');
+    writeFileSync(resolve(quickstart, '.env.local'), 'AUTH_MODE=oauth2\n');
+
+    try {
+      runSourcedLocalnetScript('QUICKSTART_DIR="$1"\nconfigure_quickstart_localnet\n', [
+        quickstart,
+      ]);
+
+      for (const healthcheck of [cantonHealthcheck, spliceHealthcheck]) {
+        const body = readFileSync(healthcheck, 'utf8');
+        expect(body).toMatch(/^set -euo pipefail$/m);
+        expect(body).not.toMatch(/set -eou pipefail/);
+      }
+    } finally {
+      rmSync(quickstart, { recursive: true, force: true });
+    }
+  });
+
   it('does not recreate Splice for a fresh stack or unchanged configuration', (): void => {
     const output = runSourcedLocalnetScript(`
 quickstart_force_full_start() { return 1; }
