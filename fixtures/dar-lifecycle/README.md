@@ -21,8 +21,7 @@ fixtures/dar-lifecycle/
 
 ## Building
 
-Requires `dpm` (Daml Package Manager) on `PATH`. Unit CI does **not** install dpm; the npm
-stubs skip cleanly when it is missing:
+Requires `dpm` (Daml Package Manager) on `PATH`. The script fails if `dpm` is missing:
 
 ```bash
 npm run fixture:dar-lifecycle:build
