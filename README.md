@@ -7,7 +7,7 @@ This package owns the versioned LocalNet lifecycle (start, readiness, diagnostic
 ## Docs
 
 - [Canton LocalNet testing](https://github.com/Fairmint/dev-docs/blob/main/docs/development/testing/canton-localnet.md)
-- [COMPATIBILITY.md](./COMPATIBILITY.md) — pinned LocalNet / Splice / scribe / protocol versions
+- [COMPATIBILITY.md](./COMPATIBILITY.md) — pinned LocalNet / Splice / scribe / protocol versions and auth defaults
 
 ## Install
 
@@ -27,6 +27,12 @@ npx canton-dev-tools readiness
 npx canton-dev-tools diagnostics
 npx canton-dev-tools teardown
 ```
+
+The binary hardcodes the four LocalNet pins from [COMPATIBILITY.md](./COMPATIBILITY.md), so `npx` /
+direct invocations apply the same defaults as `npm run localnet*`.
+
+Auth defaults to **oauth2** (Keycloak). Consumer CI that uses HS256 JWTs (for example
+`@fairmint/canton-fairmint-sdk`) should set `CANTON_LOCALNET_AUTH_MODE=shared-secret`.
 
 Legacy aliases (same binary as `canton-localnet`): `setup`, `stop`, `logs`, `status`, `smoke`, `test`, `verify`.
 
@@ -50,3 +56,5 @@ npm run build
 npm test
 npm run pack:check
 ```
+
+Internal DAR lifecycle fixture sources live under `fixtures/dar-lifecycle/` (CI/scripts only; never published).

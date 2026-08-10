@@ -43,6 +43,12 @@ function parseMaxUnpackedBytes(rawValue: string | undefined): number {
 
 function forbiddenPackagePathReason(packagePath: string): string | null {
   if (packagePath.endsWith('.dar')) return 'DAML DAR files are not runtime package artifacts';
+  if (packagePath === 'fixtures' || packagePath.startsWith('fixtures/')) {
+    return 'internal fixtures (including DAR lifecycle sources) must not be published';
+  }
+  if (packagePath === 'internal' || packagePath.startsWith('internal/')) {
+    return 'internal CI-only assets must not be published';
+  }
   if (packagePath === 'libs' || packagePath.startsWith('libs/')) {
     return 'submodules under libs/ must not be published';
   }
@@ -96,39 +102,48 @@ function throwIfSpawnFailed(command: string, result: SpawnSyncReturns<string>): 
 function readPackageConfigPins(): {
   quickstartRef: string;
   spliceVersion: string;
+  scribeVersion: string;
+  protocolVersion: string;
 } {
   const pkg = JSON.parse(readFileSync(join(process.cwd(), 'package.json'), 'utf8')) as {
     config?: {
       localnet_quickstart_ref?: string;
       localnet_splice_version?: string;
+      localnet_scribe_version?: string;
+      localnet_protocol_version?: string;
     };
   };
 
   const quickstartRef = pkg.config?.localnet_quickstart_ref;
   const spliceVersion = pkg.config?.localnet_splice_version;
-  if (!quickstartRef || !spliceVersion) {
+  const scribeVersion = pkg.config?.localnet_scribe_version;
+  const protocolVersion = pkg.config?.localnet_protocol_version;
+  if (!quickstartRef || !spliceVersion || !scribeVersion || !protocolVersion) {
     throw new Error(
-      'package.json config must define localnet_quickstart_ref and localnet_splice_version'
+      'package.json config must define localnet_quickstart_ref, localnet_splice_version, localnet_scribe_version, and localnet_protocol_version'
     );
   }
 
-  return { quickstartRef, spliceVersion };
+  return { quickstartRef, spliceVersion, scribeVersion, protocolVersion };
 }
 
 function verifyPackagedLocalnetPins(): void {
   const localnetBin = readFileSync(join(process.cwd(), 'bin', 'canton-dev-tools'), 'utf8');
-  const { quickstartRef, spliceVersion } = readPackageConfigPins();
+  const { quickstartRef, spliceVersion, scribeVersion, protocolVersion } = readPackageConfigPins();
 
-  if (!localnetBin.includes(`DEFAULT_SPLICE_VERSION="${spliceVersion}"`)) {
-    throw new Error(
-      `bin/canton-dev-tools must default to the pinned Splice version ${spliceVersion}`
-    );
-  }
+  const expectedDefaults: Array<[string, string]> = [
+    ['DEFAULT_QUICKSTART_REF', quickstartRef],
+    ['DEFAULT_SPLICE_VERSION', spliceVersion],
+    ['DEFAULT_SCRIBE_VERSION', scribeVersion],
+    ['DEFAULT_PROTOCOL_VERSION', protocolVersion],
+  ];
 
-  if (!localnetBin.includes(`DEFAULT_QUICKSTART_REF="${quickstartRef}"`)) {
-    throw new Error(
-      `bin/canton-dev-tools must default to the pinned cn-quickstart revision ${quickstartRef}`
-    );
+  for (const [name, value] of expectedDefaults) {
+    if (!localnetBin.includes(`${name}="${value}"`)) {
+      throw new Error(
+        `bin/canton-dev-tools must hardcode ${name}="${value}" for npx pin ownership`
+      );
+    }
   }
 }
 

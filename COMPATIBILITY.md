@@ -2,7 +2,10 @@
 
 `@fairmint/canton-dev-tools` is the **central owner** of Fairmint's shared Canton LocalNet pin set.
 
-Consumers should prefer this package's `package.json#config` values (and matching CLI defaults) instead of maintaining divergent pins in individual SDKs.
+Consumers should prefer this package's `package.json#config` values (and matching CLI defaults in
+`bin/canton-dev-tools`) instead of maintaining divergent pins in individual SDKs. The CLI hardcodes
+all four defaults so `npx @fairmint/canton-dev-tools start` applies them without relying on npm
+script env wiring.
 
 | Pin                     | Config key                  | Current value                              |
 | ----------------------- | --------------------------- | ------------------------------------------ |
@@ -10,6 +13,16 @@ Consumers should prefer this package's `package.json#config` values (and matchin
 | Splice image tag        | `localnet_splice_version`   | `0.6.11`                                   |
 | Scribe image tag        | `localnet_scribe_version`   | `0.6.11`                                   |
 | Canton protocol version | `localnet_protocol_version` | `35`                                       |
+
+## Auth mode
+
+| Mode            | When to use                                                                  |
+| --------------- | ---------------------------------------------------------------------------- |
+| `oauth2`        | **Package default** for `npm run localnet*` and bare CLI / `npx` invocations |
+| `shared-secret` | **Consumer CI** that signs HS256 JWTs (e.g. `@fairmint/canton-fairmint-sdk`) |
+
+Override with `CANTON_LOCALNET_AUTH_MODE=shared-secret` in consumer packages. Do not change the
+package default to shared-secret without coordinating Keycloak / OAuth2 LocalNet smoke coverage.
 
 ## Override env vars
 

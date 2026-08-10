@@ -1,7 +1,17 @@
 name: LocalNet Smoke
 
-# Nightly / manual LocalNet lifecycle smoke. Not required on every PR in ENG-1635 PR1.
-# Requires Docker on the runner. Full Splice CIP-56 CI path lands in a later PR.
+# Nightly / manual LocalNet lifecycle smoke. Not required on every PR in ENG-1635.
+# Requires Docker on the runner. Full Splice CIP-56 / CIP-112 CI path lands in a later PR.
+#
+# Docker readiness notes:
+# - The ubuntu-latest runner usually has Docker available via the Actions service, but LocalNet
+#   also needs Compose v2, passwordless sudo for host aliases / dockerd bootstrap in constrained
+#   environments, and enough disk for Splice image pulls.
+# - First-run image pulls dominate wall time; prefer a warmed runner cache once the shared LocalNet
+#   image strategy is finalized (TODO(ENG-1635)).
+# - Port 3000 must be free (cn-quickstart nginx binds 127.0.0.1:3000).
+# - If nginx was created without a network after a failed start, remove it before retrying:
+#   `docker rm -f nginx`.
 
 on:
   workflow_dispatch:
@@ -34,12 +44,29 @@ jobs:
       # TODO(ENG-1635): harden GH Actions Docker provisioning / image caching for LocalNet.
       # This job is best-effort until the shared runner image and cache strategy are finalized.
       - name: Start LocalNet
+        id: localnet-start
         run: |
           set -euo pipefail
           npm run localnet:start
 
       - name: Readiness
+        id: localnet-readiness
         run: npm run localnet:readiness
+
+      # TODO(ENG-1635 / CIP-56 / CIP-112): add a transfer integration step against LocalNet.
+      # Do NOT invent a Fairmint token for this. Use the Splice reference fixture / cn-quickstart
+      # LocalNet transfer paths (CIP-56 holdings + CIP-112 transfer instructions) once the shared
+      # LocalNet smoke is green and pin ownership is consumed by canton-node-sdk.
+      # Example outline (commented until the fixture + auth wiring land):
+      # - name: CIP-56 / CIP-112 transfer smoke (Splice reference fixture)
+      #   run: |
+      #     set -euo pipefail
+      #     # npm run localnet:cip56-transfer  # TBD: invoke Splice reference transfer helpers
+      #     echo "TODO: exercise CIP-56 holdings + CIP-112 transfer via Splice reference fixture"
+
+      - name: Diagnostics on failure
+        if: failure()
+        run: npm run localnet:diagnostics
 
       - name: Teardown
         if: always()

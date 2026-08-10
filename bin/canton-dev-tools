@@ -19,8 +19,11 @@ resolve_script_dir() {
 PACKAGE_ROOT="$(cd "$(resolve_script_dir "${BASH_SOURCE[0]}")/.." && pwd)"
 LOCALNET_SCRIPT="${PACKAGE_ROOT}/scripts/localnet-cloud.sh"
 DEFAULT_QUICKSTART_REPO="https://github.com/digital-asset/cn-quickstart.git"
+# Keep in sync with package.json#config (enforced by scripts/check-package-artifacts.ts).
 DEFAULT_QUICKSTART_REF="2f4edfc17621a7dfb6d44357050c22f4b3914c89"
 DEFAULT_SPLICE_VERSION="0.6.11"
+DEFAULT_SCRIBE_VERSION="0.6.11"
+DEFAULT_PROTOCOL_VERSION="35"
 
 log() {
   printf '[canton-dev-tools] %s\n' "$*"
@@ -51,11 +54,14 @@ One-liners:
   npx @fairmint/canton-dev-tools verify
 
 Environment:
-  CANTON_LOCALNET_QUICKSTART_DIR   Use an existing cn-quickstart/quickstart directory
-  CANTON_LOCALNET_CACHE_DIR        Cache root for fetched cn-quickstart assets
-  CANTON_LOCALNET_QUICKSTART_REF   cn-quickstart git ref to fetch
-  CANTON_LOCALNET_SPLICE_VERSION   Splice image tag (defaults to this package pin)
-  CANTON_LOCALNET_INFRA_ONLY       Defaults to true for this package binary
+  CANTON_LOCALNET_QUICKSTART_DIR     Use an existing cn-quickstart/quickstart directory
+  CANTON_LOCALNET_CACHE_DIR          Cache root for fetched cn-quickstart assets
+  CANTON_LOCALNET_QUICKSTART_REF     cn-quickstart git ref (defaults to this package pin)
+  CANTON_LOCALNET_SPLICE_VERSION     Splice image tag (defaults to this package pin)
+  CANTON_LOCALNET_SCRIBE_VERSION     Scribe image tag (defaults to this package pin)
+  CANTON_LOCALNET_PROTOCOL_VERSION   Canton protocol version (defaults to this package pin)
+  CANTON_LOCALNET_AUTH_MODE          oauth2 (package default) or shared-secret
+  CANTON_LOCALNET_INFRA_ONLY         Defaults to true for this package binary
 USAGE
 }
 
@@ -231,7 +237,10 @@ main() {
   if ! use_repo_quickstart_default; then
     export CANTON_LOCALNET_QUICKSTART_DIR="${dir}"
   fi
+  # Apply central pins for npx / direct binary invocations (not only npm scripts).
   export CANTON_LOCALNET_SPLICE_VERSION="${CANTON_LOCALNET_SPLICE_VERSION:-$(default_splice_version)}"
+  export CANTON_LOCALNET_SCRIBE_VERSION="${CANTON_LOCALNET_SCRIBE_VERSION:-${DEFAULT_SCRIBE_VERSION}}"
+  export CANTON_LOCALNET_PROTOCOL_VERSION="${CANTON_LOCALNET_PROTOCOL_VERSION:-${DEFAULT_PROTOCOL_VERSION}}"
   export CANTON_LOCALNET_INFRA_ONLY="${CANTON_LOCALNET_INFRA_ONLY:-true}"
 
   exec bash "${LOCALNET_SCRIPT}" "${normalized}" "$@"

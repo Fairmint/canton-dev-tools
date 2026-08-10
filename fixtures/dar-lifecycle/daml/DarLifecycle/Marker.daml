@@ -1,0 +1,15 @@
+-- | Minimal versionable marker template for DAR lifecycle tooling validation.
+-- Intentionally boring: enough to produce a DAR when dpm/daml is available.
+module DarLifecycle.Marker where
+
+template Marker
+  with
+    owner : Party
+    label : Text
+  where
+    signatory owner
+
+    choice ArchiveMarker : ()
+      controller owner
+      do
+        return ()

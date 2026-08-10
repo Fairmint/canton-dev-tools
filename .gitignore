@@ -9,3 +9,5 @@ coverage/
 .npmrc
 libs/
 artifacts/
+fixtures/**/.daml/
+fixtures/**/*.dar
