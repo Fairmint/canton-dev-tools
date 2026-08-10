@@ -38,3 +38,5 @@ These remain supported for one-off local experiments:
 - `CANTON_LOCALNET_INFRA_ONLY`
 
 Changing the default pins is a breaking compatibility change for shared LocalNet CI and should be reviewed as part of ENG-1635 follow-ups.
+
+SDK package-boundary ownership (what ships in publish tarballs vs CI-only fixtures) is tracked via consumer PRs under [ENG-1635](https://linear.app/fairmint/issue/ENG-1635/establish-canton-dev-tools-and-migrate-shared-canton-test).

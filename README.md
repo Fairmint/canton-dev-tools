@@ -8,7 +8,6 @@ This package owns the versioned LocalNet lifecycle (start, readiness, diagnostic
 
 - [Canton LocalNet testing](https://github.com/Fairmint/dev-docs/blob/main/docs/development/testing/canton-localnet.md)
 - [COMPATIBILITY.md](./COMPATIBILITY.md) — pinned LocalNet / Splice / scribe / protocol versions and auth defaults
-- [SDK package-boundary audit](./docs/sdk-package-boundary-audit.md) — ENG-1635 production vs CI-only surfaces across Canton SDKs
 
 ## Install
 

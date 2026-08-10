@@ -42,7 +42,8 @@ async function isLedgerReachable(): Promise<boolean> {
     const response = await fetch(`${LEDGER_URL.replace(/\/$/, '')}/v2/version`, {
       signal: AbortSignal.timeout(2_000),
     });
-    return response.ok;
+    // Match LocalNet readiness: oauth2 Ledger returns 401 without a token.
+    return response.ok || response.status === 401;
   } catch {
     return false;
   }
