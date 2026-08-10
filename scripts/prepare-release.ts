@@ -42,6 +42,39 @@ function tagExists(tag: string): boolean {
   }
 }
 
+/** Encode a scoped package name for the npm registry HTTP API. */
+function encodePackageNameForRegistry(packageName: string): string {
+  return packageName.replace('/', '%2f');
+}
+
+/**
+ * Read published versions from the public registry HTTP API.
+ *
+ * Prefer this over `npm view` when a classic auth token in npmrc can 404 public
+ * packages the token cannot read (npm reports that as 404, not 403).
+ */
+function getNpmMetadataFromRegistry(packageName: string): {
+  latest: string | null;
+  versions: Set<string>;
+} | null {
+  try {
+    const encodedName = encodePackageNameForRegistry(packageName);
+    const result = execSync(`curl -fsS "https://registry.npmjs.org/${encodedName}"`, {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    }).trim();
+    const metadata = JSON.parse(result) as {
+      'dist-tags'?: { latest?: string };
+      versions?: Record<string, unknown>;
+    };
+    const versions = new Set(Object.keys(metadata.versions ?? {}));
+    const latest = metadata['dist-tags']?.latest ?? null;
+    return { latest, versions };
+  } catch {
+    return null;
+  }
+}
+
 /** Get all published versions from NPM registry */
 function getAllNpmVersions(packageName: string): Set<string> {
   try {
@@ -54,7 +87,7 @@ function getAllNpmVersions(packageName: string): Set<string> {
     }
     return new Set([versions]);
   } catch {
-    // Package may not exist on NPM yet (404)
+    // Package may not exist on NPM yet (404), or auth may hide a public package.
     return new Set();
   }
 }
@@ -65,7 +98,7 @@ function getLatestNpmVersion(packageName: string): string | null {
     const result = execSync(`npm view "${packageName}" version`, { encoding: 'utf8' }).trim();
     return result || null;
   } catch {
-    // Package may not exist on NPM yet (404)
+    // Package may not exist on NPM yet (404), or auth may hide a public package.
     return null;
   }
 }
@@ -151,8 +184,19 @@ function prepareRelease(): void {
     console.log(`Current version in package.json: ${currentVersion}`);
 
     console.log('Fetching published versions from NPM...');
-    const npmVersions = getAllNpmVersions(packageName);
-    const latestNpmVersion = getLatestNpmVersion(packageName);
+    let npmVersions = getAllNpmVersions(packageName);
+    let latestNpmVersion = getLatestNpmVersion(packageName);
+
+    // Authenticated npmrcs can make `npm view` 404 public packages. Fall back once
+    // to the public registry HTTP API so we do not republish an existing version.
+    if (!latestNpmVersion && npmVersions.size === 0) {
+      const registryMetadata = getNpmMetadataFromRegistry(packageName);
+      if (registryMetadata) {
+        console.log('npm view returned no versions; using public registry HTTP metadata instead');
+        npmVersions = registryMetadata.versions;
+        latestNpmVersion = registryMetadata.latest;
+      }
+    }
 
     if (latestNpmVersion) {
       console.log(`Latest version on NPM: ${latestNpmVersion}`);

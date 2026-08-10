@@ -27,4 +27,9 @@ describe('selectReleaseVersion', (): void => {
   it('does not reuse an advanced manifest version that is already tagged', (): void => {
     expect(selectReleaseVersion('0.6.0', '0.5.23', withTakenVersions('0.6.0'))).toBe('0.6.1');
   });
+
+  it('patch-bumps when npm already has the package.json floor version', (): void => {
+    // Mirrors the first post-bootstrap publish: npm has 0.1.0, manifest still says 0.1.0.
+    expect(selectReleaseVersion('0.1.0', '0.1.0', withTakenVersions('0.1.0'))).toBe('0.1.1');
+  });
 });
