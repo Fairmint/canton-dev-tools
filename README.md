@@ -46,8 +46,9 @@ npx canton-dev-tools sync-splice-dars
 
 ### `sync-splice-dars` config
 
-By default, sync uses the packaged pin at `config/default-splice-dars.json` (Splice **0.7.0**
-token-standard + amulet DARs). Optional overrides, in order:
+By default, sync uses the packaged pin at `config/default-splice-dars.json` (MainNet Splice
+**0.6.14** / commit `398919a5b13479877fd61587003ba7a4ba00091b`, token-standard + amulet DARs).
+Optional overrides, in order:
 
 1. `--config <path>`
 2. `CANTON_SPLICE_DARS_CONFIG`
