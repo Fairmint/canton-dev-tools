@@ -1,6 +1,14 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync, existsSync, readFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  writeFileSync,
+  existsSync,
+  readFileSync,
+  symlinkSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -129,6 +137,21 @@ describe('path containment helpers', (): void => {
       expect(() => resolveContainedPath(root, '../b.dar', 'file')).toThrow(/Unsafe/);
     } finally {
       rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects paths that escape via symlink components', (): void => {
+    const root = mkdtempSync(join(tmpdir(), 'canton-dev-tools-symlink-'));
+    const outside = mkdtempSync(join(tmpdir(), 'canton-dev-tools-outside-'));
+    try {
+      mkdirSync(join(root, 'dars'), { recursive: true });
+      symlinkSync(outside, join(root, 'dars', 'Pkg'));
+      expect(() => resolveContainedPath(join(root, 'dars'), 'Pkg/x.dar', 'dars.lock key')).toThrow(
+        /symlink/
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+      rmSync(outside, { recursive: true, force: true });
     }
   });
 });

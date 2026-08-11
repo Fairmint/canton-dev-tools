@@ -179,6 +179,30 @@ export function resolveContainedPath(root: string, relativePath: string, label: 
   if (resolved !== resolvedRoot && !resolved.startsWith(`${resolvedRoot}${path.sep}`)) {
     throw new Error(`Unsafe ${label} escapes root: ${relativePath}`);
   }
+
+  // Compute the real containment root even when `root` does not exist yet by mapping
+  // through the nearest existing ancestor's realpath.
+  let ancestor = resolvedRoot;
+  while (!fs.existsSync(ancestor)) {
+    const parent = path.dirname(ancestor);
+    if (parent === ancestor) break;
+    ancestor = parent;
+  }
+  const realAncestor = fs.existsSync(ancestor) ? fs.realpathSync(ancestor) : ancestor;
+  const rootSuffix = path.relative(ancestor, resolvedRoot);
+  const realRoot = rootSuffix ? path.join(realAncestor, rootSuffix) : realAncestor;
+
+  // Reject symlink components under the root that resolve outside realRoot.
+  let current = resolvedRoot;
+  for (const part of path.relative(resolvedRoot, resolved).split(path.sep)) {
+    if (!part) continue;
+    current = path.join(current, part);
+    if (!fs.existsSync(current)) break;
+    const realCurrent = fs.realpathSync(current);
+    if (realCurrent !== realRoot && !realCurrent.startsWith(`${realRoot}${path.sep}`)) {
+      throw new Error(`Unsafe ${label} escapes root via symlink: ${relativePath}`);
+    }
+  }
   return resolved;
 }
 

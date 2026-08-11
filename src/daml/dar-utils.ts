@@ -50,6 +50,39 @@ export function getDarsDir(rootDir: string): string {
   return path.join(rootDir, 'dars');
 }
 
+/** Parse and validate a dars.lock JSON document. */
+export function parseDarsLockContent(
+  content: string,
+  label: string,
+  options: { requireVersion1?: boolean } = {}
+): DarsLock {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(content);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    throw new Error(`Failed to parse dars.lock at ${label}: ${message}`);
+  }
+
+  if (
+    typeof parsed !== 'object' ||
+    parsed === null ||
+    !('version' in parsed) ||
+    typeof Reflect.get(parsed, 'version') !== 'number' ||
+    !('packages' in parsed) ||
+    typeof Reflect.get(parsed, 'packages') !== 'object' ||
+    Reflect.get(parsed, 'packages') === null
+  ) {
+    throw new Error(`Invalid dars.lock format at ${label}`);
+  }
+
+  const lock = parsed as DarsLock;
+  if (options.requireVersion1 && lock.version !== 1) {
+    throw new Error(`Invalid dars.lock at ${label} (expected version 1)`);
+  }
+  return lock;
+}
+
 /** Load the dars.lock file. */
 export function loadDarsLock(rootDir: string): DarsLock {
   const lockPath = path.join(getDarsDir(rootDir), 'dars.lock');
@@ -61,21 +94,7 @@ export function loadDarsLock(rootDir: string): DarsLock {
   const content = fs.readFileSync(lockPath, 'utf-8');
 
   try {
-    const parsed: unknown = JSON.parse(content);
-
-    if (
-      typeof parsed !== 'object' ||
-      parsed === null ||
-      !('version' in parsed) ||
-      typeof parsed.version !== 'number' ||
-      !('packages' in parsed) ||
-      typeof parsed.packages !== 'object' ||
-      parsed.packages === null
-    ) {
-      throw new Error(`Invalid dars.lock format at ${lockPath}`);
-    }
-
-    return parsed as DarsLock;
+    return parseDarsLockContent(content, lockPath);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     console.error(`❌ Failed to parse dars.lock at ${lockPath}: ${message}`);

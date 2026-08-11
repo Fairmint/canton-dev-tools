@@ -19,8 +19,10 @@ collect_daml_yaml_files() {
         in_packages && /^[[:space:]]*-[[:space:]]+/ {
           line=$0
           sub(/^[[:space:]]*-[[:space:]]+/, "", line)
+          sub(/[[:space:]]+#.*$/, "", line)
           gsub(/["'\'']/, "", line)
-          print line
+          gsub(/^[[:space:]]+|[[:space:]]+$/, "", line)
+          if (length(line) > 0) print line
           next
         }
         in_packages && /^[^[:space:]#]/ { in_packages=0 }

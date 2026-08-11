@@ -16,6 +16,7 @@ import {
   getDarsDir,
   getFreshDarPath,
   loadDarsLock,
+  parseDarsLockContent,
   type DarsLock,
   type DarsLockEntry,
 } from './dar-utils';
@@ -89,19 +90,10 @@ function loadLockAtRef(rootDir: string, ref: string): DarsLock {
     return { version: 1, packages: {} };
   }
 
-  const parsed: unknown = JSON.parse(gitText(rootDir, ['show', `${ref}:dars/dars.lock`]));
-  if (
-    typeof parsed !== 'object' ||
-    parsed === null ||
-    !('version' in parsed) ||
-    parsed.version !== 1 ||
-    !('packages' in parsed) ||
-    typeof parsed.packages !== 'object' ||
-    parsed.packages === null
-  ) {
-    throw new Error(`Invalid dars.lock at ${ref}`);
-  }
-  return parsed as DarsLock;
+  const parsed = parseDarsLockContent(gitText(rootDir, ['show', `${ref}:dars/dars.lock`]), `${ref}:dars/dars.lock`, {
+    requireVersion1: true,
+  });
+  return parsed;
 }
 
 function lockEntriesForPackage(lock: DarsLock, packageName: string) {

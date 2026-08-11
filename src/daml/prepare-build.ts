@@ -38,13 +38,41 @@ function copyDir(source: string, target: string): void {
   });
 }
 
-function rewritePackageReferences(value: string, packageNames: Map<string, string>): string {
-  let rewritten = value;
-  for (const [sourceDir, packageName] of packageNames) {
-    rewritten = rewritten.split(`../${sourceDir}/`).join(`../${packageName}/`);
+function rewriteDependency(
+  dependency: string,
+  currentSourceDir: string,
+  rootDir: string,
+  packageNames: Map<string, string>
+): string {
+  // Keep non-relative entries (package ids, absolute paths) unchanged.
+  if (!dependency.startsWith('.')) return dependency;
+
+  const currentSourcePath = path.resolve(rootDir, currentSourceDir);
+  const resolved = path.resolve(currentSourcePath, dependency);
+  const normalizedResolved = resolved.replace(/\\/g, '/');
+
+  // Prefer longer source dirs so OpenCapTable wins over OpenCap prefixes.
+  const sourceDirs = [...packageNames.keys()].sort((left, right) => right.length - left.length);
+  for (const sourceDir of sourceDirs) {
+    const packageName = packageNames.get(sourceDir);
+    if (!packageName) continue;
+    const packagePath = path.resolve(rootDir, sourceDir);
+    if (resolved === packagePath || resolved.startsWith(`${packagePath}${path.sep}`)) {
+      const rest = path.relative(packagePath, resolved).split(path.sep).join('/');
+      return rest ? `../${packageName}/${rest}` : `../${packageName}`;
+    }
   }
-  rewritten = rewritten.split('../libs/').join('../../../libs/');
-  return rewritten;
+
+  const libsPath = path.resolve(rootDir, 'libs');
+  if (resolved === libsPath || resolved.startsWith(`${libsPath}${path.sep}`)) {
+    const rest = path.relative(libsPath, resolved).split(path.sep).join('/');
+    // generated/build/<pkg> -> repo root libs/
+    return rest ? `../../../libs/${rest}` : '../../../libs';
+  }
+
+  // Leave unresolved relative paths alone (caller may still fail later at build time).
+  void normalizedResolved;
+  return dependency;
 }
 
 /** Require `candidate` to resolve strictly inside `rootDir` (not the root itself). */
@@ -102,7 +130,7 @@ export function prepareBuild(options: PrepareBuildOptions): string[] {
       const deps = damlYaml[key];
       if (Array.isArray(deps)) {
         damlYaml[key] = deps.map((dependency) =>
-          rewritePackageReferences(dependency, packageNames)
+          rewriteDependency(dependency, sourceDir, rootDir, packageNames)
         );
       }
     }

@@ -15,6 +15,7 @@ import {
   getDarLockKey,
   getDarsDir,
   loadDarsLock,
+  parseDarsLockContent,
   saveDarsLock,
   type DarsLock,
   type DarsLockEntry,
@@ -89,7 +90,7 @@ function loadLockAtRef(rootDir: string, ref: string): DarsLock {
     cwd: rootDir,
     encoding: 'utf8',
   });
-  return JSON.parse(output) as DarsLock;
+  return parseDarsLockContent(output, `${ref}:dars/dars.lock`, { requireVersion1: true });
 }
 
 function migrationCandidateVersion(

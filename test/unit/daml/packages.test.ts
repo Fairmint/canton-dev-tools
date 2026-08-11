@@ -96,6 +96,57 @@ describe('daml package discovery + prepare-build', (): void => {
     expect(testDamlYaml).toContain('WrappedAssets-v01');
   });
 
+  it('rewrites nested and prefix-sensitive dependency paths into generated sibling packages', (): void => {
+    mkdirSync(join(rootDir, 'group-a', 'token', 'daml'), { recursive: true });
+    mkdirSync(join(rootDir, 'group-b', 'token', 'daml'), { recursive: true });
+    mkdirSync(join(rootDir, 'OpenCap', 'daml'), { recursive: true });
+    mkdirSync(join(rootDir, 'OpenCapTable', 'daml'), { recursive: true });
+    writeFileSync(
+      join(rootDir, 'multi-package.yaml'),
+      `packages:\n  - group-a/token\n  - group-b/token\n  - OpenCap\n  - OpenCapTable\n`
+    );
+    writeFileSync(
+      join(rootDir, 'group-a', 'token', 'daml.yaml'),
+      `sdk-version: 3.5.2\nname: TokenA-v01\nsource: daml\nversion: 0.0.1\ndata-dependencies:\n  - ../../group-b/token/.daml/dist/TokenB-v01-0.0.1.dar\n  - ../../libs/splice/foo.dar\n`
+    );
+    writeFileSync(
+      join(rootDir, 'group-b', 'token', 'daml.yaml'),
+      `sdk-version: 3.5.2\nname: TokenB-v01\nsource: daml\nversion: 0.0.1\ndependencies: []\n`
+    );
+    writeFileSync(
+      join(rootDir, 'OpenCap', 'daml.yaml'),
+      `sdk-version: 3.5.2\nname: OpenCap-v01\nsource: daml\nversion: 0.0.1\ndependencies: []\n`
+    );
+    writeFileSync(
+      join(rootDir, 'OpenCapTable', 'daml.yaml'),
+      `sdk-version: 3.5.2\nname: OpenCapTable-v01\nsource: daml\nversion: 0.0.1\ndata-dependencies:\n  - ../OpenCapTable/.daml/dist/OpenCapTable-v01-0.0.1.dar\n`
+    );
+    for (const rel of [
+      'group-a/token/daml/Main.daml',
+      'group-b/token/daml/Main.daml',
+      'OpenCap/daml/Main.daml',
+      'OpenCapTable/daml/Main.daml',
+    ]) {
+      writeFileSync(join(rootDir, rel), 'module Main where\n');
+    }
+
+    prepareBuild({ rootDir });
+    const tokenA = readFileSync(
+      join(rootDir, 'generated', 'build', 'TokenA-v01', 'daml.yaml'),
+      'utf8'
+    );
+    expect(tokenA).toContain('../TokenB-v01/.daml/dist/TokenB-v01-0.0.1.dar');
+    expect(tokenA).toContain('../../../libs/splice/foo.dar');
+    expect(tokenA).not.toContain('../../group-b/token');
+
+    const openCapTable = readFileSync(
+      join(rootDir, 'generated', 'build', 'OpenCapTable-v01', 'daml.yaml'),
+      'utf8'
+    );
+    expect(openCapTable).toContain('../OpenCapTable-v01/.daml/dist/OpenCapTable-v01-0.0.1.dar');
+    expect(openCapTable).not.toContain('../OpenCap/.daml');
+  });
+
   it('rejects build paths that escape the repo root', (): void => {
     expect(() => assertPathInsideRoot(rootDir, rootDir, 'build root')).toThrow(/inside the repo/);
     expect(() => assertPathInsideRoot(rootDir, join(rootDir, '..'), 'build root')).toThrow(
