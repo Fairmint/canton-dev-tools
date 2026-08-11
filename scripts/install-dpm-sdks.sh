@@ -3,8 +3,40 @@
 # Migrated from canton-assets / daml (identical). MIT-licensed in this package.
 set -euo pipefail
 
+# Prefer multi-package.yaml package entries (supports nested paths). Fall back to a
+# pruned filesystem scan that still reaches nested packages while skipping build/vendor trees.
+collect_daml_yaml_files() {
+  if [ -f multi-package.yaml ]; then
+    local package_dir=""
+    while IFS= read -r package_dir; do
+      [ -n "$package_dir" ] || continue
+      if [ -f "${package_dir}/daml.yaml" ]; then
+        printf '%s\0' "${package_dir}/daml.yaml"
+      fi
+    done < <(
+      awk '
+        /^packages:/ { in_packages=1; next }
+        in_packages && /^[[:space:]]*-[[:space:]]+/ {
+          line=$0
+          sub(/^[[:space:]]*-[[:space:]]+/, "", line)
+          gsub(/["'\'']/, "", line)
+          print line
+          next
+        }
+        in_packages && /^[^[:space:]#]/ { in_packages=0 }
+      ' multi-package.yaml
+    )
+    return
+  fi
+
+  find . \
+    \( -name .git -o -name node_modules -o -name generated -o -name .daml -o -name libs -o -name dist -o -name coverage \) \
+    -type d -prune \
+    -o -name daml.yaml -print0
+}
+
 sdk_versions=$(
-  find . -maxdepth 2 -name daml.yaml -print0 \
+  collect_daml_yaml_files \
     | xargs -0 awk '/^sdk-version:/ { print $2 }' \
     | sort -u
 )
