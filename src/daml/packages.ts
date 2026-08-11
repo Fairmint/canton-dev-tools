@@ -125,14 +125,18 @@ export function findPackage(
   if (!query) return undefined;
 
   const lower = query.toLowerCase();
-  const exact = packages.find(
+  const exactMatches = packages.filter(
     (pkg) =>
       pkg.key === lower ||
       pkg.name.toLowerCase() === lower ||
       pkg.sourceDir.toLowerCase() === lower ||
       path.basename(pkg.sourceDir).toLowerCase() === lower
   );
-  if (exact) return exact;
+  if (exactMatches.length === 1) return exactMatches[0];
+  if (exactMatches.length > 1) {
+    const labels = exactMatches.map((pkg) => `${pkg.key} (${pkg.sourceDir})`).join(', ');
+    throw new Error(`Ambiguous package "${query}"; matches: ${labels}`);
+  }
 
   const normalizedQuery = normalizeToken(query);
   if (!normalizedQuery) return undefined;

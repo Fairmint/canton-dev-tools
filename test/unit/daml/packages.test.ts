@@ -52,6 +52,28 @@ describe('daml package discovery + prepare-build', (): void => {
     expect(findPackage(managed, 'WrappedAssets-v01')?.key).toBe('wrappedassets-v01');
   });
 
+  it('rejects ambiguous exact key matches from nested source dirs', (): void => {
+    mkdirSync(join(rootDir, 'group-a', 'token', 'daml'), { recursive: true });
+    mkdirSync(join(rootDir, 'group-b', 'token', 'daml'), { recursive: true });
+    writeFileSync(
+      join(rootDir, 'multi-package.yaml'),
+      `packages:\n  - group-a/token\n  - group-b/token\n`
+    );
+    writeFileSync(
+      join(rootDir, 'group-a', 'token', 'daml.yaml'),
+      `sdk-version: 3.5.2\nname: TokenA-v01\nsource: daml\nversion: 0.0.1\ndependencies: []\n`
+    );
+    writeFileSync(
+      join(rootDir, 'group-b', 'token', 'daml.yaml'),
+      `sdk-version: 3.5.2\nname: TokenB-v01\nsource: daml\nversion: 0.0.1\ndependencies: []\n`
+    );
+    writeFileSync(join(rootDir, 'group-a', 'token', 'daml', 'Main.daml'), 'module Main where\n');
+    writeFileSync(join(rootDir, 'group-b', 'token', 'daml', 'Main.daml'), 'module Main where\n');
+
+    const managed = discoverManagedPackages(rootDir);
+    expect(() => findPackage(managed, 'token')).toThrow(/Ambiguous package/);
+  });
+
   it('prepare-build copies packages into generated/build and writes multi-package.yaml', (): void => {
     const generated = prepareBuild({ rootDir });
     expect(generated).toEqual(['WrappedAssets-v01', 'Test']);

@@ -9,6 +9,7 @@ import { execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { computeSha256, getDarLockKey, getDarsDir, loadDarsLock } from './dar-utils';
+import { compareSemver, parseStrictSemver } from './dar-version-policy';
 import { discoverManagedPackages, type PackageConfig } from './packages';
 
 export interface CheckUpgradeCompatibilityOptions {
@@ -30,17 +31,6 @@ function parsePackageName(name: string): { baseName: string; majorVersion: numbe
   return { baseName: name, majorVersion: null };
 }
 
-function compareSemver(a: string, b: string): number {
-  const pa = a.split('.').map((x) => parseInt(x, 10) || 0);
-  const pb = b.split('.').map((x) => parseInt(x, 10) || 0);
-  for (let i = 0; i < 3; i++) {
-    const da = pa[i] ?? 0;
-    const db = pb[i] ?? 0;
-    if (da !== db) return da - db;
-  }
-  return 0;
-}
-
 interface BackupRecord {
   packageName: string;
   version: string;
@@ -59,6 +49,9 @@ function getBackedUpPackages(rootDir: string): Map<string, BackupRecord[]> {
 
     const [packageName, version] = parts;
     if (!packageName || !version) continue;
+    if (!parseStrictSemver(version)) {
+      throw new Error(`Invalid semver in dars.lock key: ${lockKey}`);
+    }
     // Keep lock entries even when the DAR is missing on disk. Dropping them would
     // hide broken baselines and treat the package as a first release (skipping
     // upgrade-check). Missing files fail later via verifyBackupAgainstLock.
@@ -185,13 +178,16 @@ export function checkUpgradeCompatibility(options: CheckUpgradeCompatibilityOpti
 
   let hasFailures = false;
   let checkedCount = 0;
-  let skippedCount = 0;
 
   for (const pkg of currentPackages) {
     const currentDar = getCurrentDar(rootDir, pkg);
     if (!currentDar) {
-      console.log(`⏭️  Skipping ${pkg.name} (no built DAR found at ${pkg.buildDir}/.daml/dist)`);
-      skippedCount++;
+      console.error(
+        `❌ ${pkg.name}: no built DAR found at ${pkg.buildDir}/.daml/dist/${pkg.darName}-${pkg.version}.dar`
+      );
+      console.error('   Build packages before running check-upgrade-compat.\n');
+      hasFailures = true;
+      checkedCount++;
       continue;
     }
 
@@ -301,7 +297,7 @@ export function checkUpgradeCompatibility(options: CheckUpgradeCompatibilityOpti
   }
 
   console.log('---');
-  console.log(`📊 Summary: ${checkedCount} checked, ${skippedCount} skipped`);
+  console.log(`📊 Summary: ${checkedCount} checked`);
 
   if (hasFailures) {
     throw new Error(

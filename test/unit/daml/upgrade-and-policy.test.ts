@@ -40,7 +40,103 @@ describe('checkUpgradeCompatibility', (): void => {
   });
 
   it('fails when every managed package is skipped for missing built DARs', (): void => {
-    expect(() => checkUpgradeCompatibility({ rootDir })).toThrow(/no built DARs to validate/i);
+    const logged: string[] = [];
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation((...args: unknown[]) => {
+      logged.push(args.map(String).join(' '));
+    });
+    const logSpy = jest.spyOn(console, 'log').mockImplementation(() => undefined);
+    try {
+      expect(() => checkUpgradeCompatibility({ rootDir })).toThrow(
+        /Upgrade compatibility check failed/
+      );
+      expect(logged.join('\n')).toMatch(/no built DAR found/);
+    } finally {
+      errorSpy.mockRestore();
+      logSpy.mockRestore();
+    }
+  });
+
+  it('fails when only some managed packages are missing built DARs', (): void => {
+    writePackage(rootDir, 'Other-v01', 'Other-v01', '0.0.1');
+    writeFileSync(
+      join(rootDir, 'multi-package.yaml'),
+      `packages:\n  - WrappedAssets-v01\n  - Other-v01\n`
+    );
+    const built = Buffer.from('other-dar');
+    const distDir = join(rootDir, 'generated', 'build', 'Other-v01', '.daml', 'dist');
+    mkdirSync(distDir, { recursive: true });
+    writeFileSync(join(distDir, 'Other-v01-0.0.1.dar'), built);
+    mkdirSync(join(rootDir, 'dars', 'Other-v01', '0.0.1'), { recursive: true });
+    writeFileSync(join(rootDir, 'dars', 'Other-v01', '0.0.1', 'Other-v01.dar'), built);
+    saveDarsLock(rootDir, {
+      version: 1,
+      packages: {
+        'Other-v01/0.0.1/Other-v01.dar': {
+          sha256: sha256(built),
+          size: built.length,
+          sdkVersion: '3.5.2',
+          uploadedAt: '2026-01-01T00:00:00.000Z',
+          networks: [],
+        },
+      },
+    });
+
+    const logged: string[] = [];
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation((...args: unknown[]) => {
+      logged.push(args.map(String).join(' '));
+    });
+    const logSpy = jest.spyOn(console, 'log').mockImplementation(() => undefined);
+    try {
+      expect(() => checkUpgradeCompatibility({ rootDir })).toThrow(
+        /Upgrade compatibility check failed/
+      );
+      expect(logged.join('\n')).toMatch(/WrappedAssets-v01: no built DAR found/);
+    } finally {
+      errorSpy.mockRestore();
+      logSpy.mockRestore();
+    }
+  });
+
+  it('rejects non-semver versions in dars.lock when selecting upgrade baselines', (): void => {
+    const currentBytes = Buffer.from('current-dar');
+    const distDir = join(
+      rootDir,
+      'generated',
+      'build',
+      'WrappedAssets-v01',
+      '.daml',
+      'dist'
+    );
+    mkdirSync(distDir, { recursive: true });
+    writeFileSync(join(distDir, 'WrappedAssets-v01-0.0.2.dar'), currentBytes);
+    mkdirSync(join(rootDir, 'dars', 'WrappedAssets-v01', '0.0.2'), { recursive: true });
+    writeFileSync(
+      join(rootDir, 'dars', 'WrappedAssets-v01', '0.0.2', 'WrappedAssets-v01.dar'),
+      currentBytes
+    );
+    saveDarsLock(rootDir, {
+      version: 1,
+      packages: {
+        'WrappedAssets-v01/not-a-version/WrappedAssets-v01.dar': {
+          sha256: sha256('x'),
+          size: 1,
+          sdkVersion: '3.5.2',
+          uploadedAt: '2026-01-01T00:00:00.000Z',
+          networks: [],
+        },
+        'WrappedAssets-v01/0.0.2/WrappedAssets-v01.dar': {
+          sha256: sha256(currentBytes),
+          size: currentBytes.length,
+          sdkVersion: '3.5.2',
+          uploadedAt: '2026-02-01T00:00:00.000Z',
+          networks: [],
+        },
+      },
+    });
+
+    expect(() => checkUpgradeCompatibility({ rootDir })).toThrow(
+      /Invalid semver in dars.lock key/
+    );
   });
 
   it('fails when an older lock baseline is missing on disk instead of treating as first release', (): void => {
