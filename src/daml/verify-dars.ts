@@ -12,6 +12,7 @@ import {
   saveDarsLock,
   type DarsLockEntry,
 } from './dar-utils';
+import { resolveContainedPath } from './sync-splice-dars';
 
 export interface VerifyDarsOptions {
   rootDir: string;
@@ -45,7 +46,16 @@ export function verifyDars(options: VerifyDarsOptions): VerificationResult {
   };
 
   for (const [lockKey, entry] of Object.entries(lock.packages)) {
-    const darPath = path.join(darsDir, lockKey);
+    let darPath: string;
+    try {
+      darPath = resolveContainedPath(darsDir, lockKey, 'dars.lock key');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`❌ Unsafe lock key: ${lockKey}`);
+      result.errors.push(`Unsafe dars.lock key (escapes dars/): ${lockKey} (${message})`);
+      result.mismatch++;
+      continue;
+    }
     checkedPaths.add(darPath);
 
     if (!fs.existsSync(darPath)) {

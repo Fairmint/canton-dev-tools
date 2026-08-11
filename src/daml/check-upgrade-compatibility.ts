@@ -226,12 +226,15 @@ export function checkUpgradeCompatibility(options: CheckUpgradeCompatibilityOpti
       continue;
     }
 
-    if (!fs.existsSync(committedBackupPath)) {
-      console.error(
-        `❌ ${currentPackageName}: dars.lock lists ${currentLockKey} but the file is missing on disk.\n`
-      );
-      console.error(`   Expected file: ${committedBackupPath}`);
-      console.error('   Restore from git or re-run backup-dar and commit.\n');
+    try {
+      verifyBackupAgainstLock(rootDir, {
+        packageName: currentPackageName,
+        version: currentDar.version,
+        darPath: committedBackupPath,
+        lockKey: currentLockKey,
+      });
+    } catch (error) {
+      console.error(`❌ ${error instanceof Error ? error.message : String(error)}\n`);
       hasFailures = true;
       checkedCount++;
       continue;

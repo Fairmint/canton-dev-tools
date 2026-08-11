@@ -99,6 +99,53 @@ describe('checkUpgradeCompatibility', (): void => {
       logSpy.mockRestore();
     }
   });
+
+  it('fails when the committed current backup exists but does not match dars.lock', (): void => {
+    const buildBytes = Buffer.from('build-dar');
+    const corruptBackup = Buffer.from('corrupt-backup-bytes');
+    const distDir = join(
+      rootDir,
+      'generated',
+      'build',
+      'WrappedAssets-v01',
+      '.daml',
+      'dist'
+    );
+    mkdirSync(distDir, { recursive: true });
+    writeFileSync(join(distDir, 'WrappedAssets-v01-0.0.2.dar'), buildBytes);
+    mkdirSync(join(rootDir, 'dars', 'WrappedAssets-v01', '0.0.2'), { recursive: true });
+    writeFileSync(
+      join(rootDir, 'dars', 'WrappedAssets-v01', '0.0.2', 'WrappedAssets-v01.dar'),
+      corruptBackup
+    );
+    saveDarsLock(rootDir, {
+      version: 1,
+      packages: {
+        'WrappedAssets-v01/0.0.2/WrappedAssets-v01.dar': {
+          sha256: sha256(buildBytes),
+          size: buildBytes.length,
+          sdkVersion: '3.5.2',
+          uploadedAt: '2026-02-01T00:00:00.000Z',
+          networks: [],
+        },
+      },
+    });
+
+    const logged: string[] = [];
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation((...args: unknown[]) => {
+      logged.push(args.map(String).join(' '));
+    });
+    const logSpy = jest.spyOn(console, 'log').mockImplementation(() => undefined);
+    try {
+      expect(() => checkUpgradeCompatibility({ rootDir })).toThrow(
+        /Upgrade compatibility check failed/
+      );
+      expect(logged.join('\n')).toMatch(/Baseline backup failed integrity check/);
+    } finally {
+      errorSpy.mockRestore();
+      logSpy.mockRestore();
+    }
+  });
 });
 
 describe('checkDarVersionPolicy --package', (): void => {

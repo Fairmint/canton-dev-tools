@@ -72,6 +72,21 @@ describe('verify-dars semantics', (): void => {
     expect(result.errors.some((error) => error.includes('Missing DAR'))).toBe(true);
   });
 
+  it('rejects lock keys that escape the dars directory', (): void => {
+    writeLock({
+      '../outside.dar': {
+        sha256: 'abc',
+        size: 1,
+        sdkVersion: '3.5.2',
+        uploadedAt: '2026-01-01T00:00:00.000Z',
+        networks: [],
+      },
+    });
+
+    const result = verifyDars({ rootDir });
+    expect(result.errors.some((error) => error.includes('Unsafe dars.lock key'))).toBe(true);
+  });
+
   it('updates size mismatches with --update without recording an error', (): void => {
     const content = Buffer.from('dar-bytes');
     const darPath = join(rootDir, 'dars', 'Pkg', '0.0.1', 'Pkg.dar');

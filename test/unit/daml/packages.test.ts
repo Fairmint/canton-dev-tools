@@ -104,4 +104,22 @@ describe('daml package discovery + prepare-build', (): void => {
     );
     expect(() => prepareBuild({ rootDir })).toThrow(/Unsafe/);
   });
+
+  it('rejects escaping source dirs and daml.yaml names during package discovery', (): void => {
+    writeFileSync(
+      join(rootDir, 'multi-package.yaml'),
+      `packages:\n  - ../outside\n`
+    );
+    expect(() => discoverPackages(rootDir)).toThrow(/Unsafe/);
+
+    writeFileSync(
+      join(rootDir, 'multi-package.yaml'),
+      `packages:\n  - WrappedAssets-v01\n`
+    );
+    writeFileSync(
+      join(rootDir, 'WrappedAssets-v01', 'daml.yaml'),
+      `sdk-version: 3.5.2\nname: ../escape\nsource: daml\nversion: 0.0.1\ndependencies: []\n`
+    );
+    expect(() => discoverPackages(rootDir)).toThrow(/Unsafe/);
+  });
 });

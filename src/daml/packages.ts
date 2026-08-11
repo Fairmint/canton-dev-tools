@@ -8,6 +8,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as yaml from 'yaml';
+import { assertSafeRelativePath, resolveContainedPath } from './sync-splice-dars';
 import { isContractNetwork, type ContractNetwork } from './types';
 
 export interface PackageConfig {
@@ -72,9 +73,13 @@ export function discoverPackages(
   const manifest = readYamlFile<{ packages?: string[] }>(manifestPath);
   const sourcePackages = manifest.packages ?? [];
   const packages: PackageConfig[] = [];
+  assertSafeRelativePath(buildRoot, 'discoverPackages buildRoot');
+  const resolvedBuildRoot = resolveContainedPath(rootDir, buildRoot, 'discoverPackages buildRoot');
 
   for (const sourceDir of sourcePackages) {
-    const damlYamlPath = path.join(rootDir, sourceDir, 'daml.yaml');
+    assertSafeRelativePath(sourceDir, 'multi-package.yaml packages entry');
+    const sourcePath = resolveContainedPath(rootDir, sourceDir, 'multi-package.yaml packages entry');
+    const damlYamlPath = path.join(sourcePath, 'daml.yaml');
     if (!fs.existsSync(damlYamlPath)) {
       throw new Error(`daml.yaml not found: ${damlYamlPath}`);
     }
@@ -82,6 +87,9 @@ export function discoverPackages(
     if (!metadata.name || !metadata.version) {
       throw new Error(`${damlYamlPath} is missing required name/version fields`);
     }
+    assertSafeRelativePath(metadata.name, 'daml.yaml name');
+    // Ensure derived buildDir stays under buildRoot (name already path-safe).
+    resolveContainedPath(resolvedBuildRoot, metadata.name, 'daml.yaml name');
 
     const pkg: PackageConfig = {
       key: packageKeyFromSourceDir(sourceDir),
