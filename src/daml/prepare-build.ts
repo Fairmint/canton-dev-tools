@@ -8,7 +8,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as yaml from 'yaml';
-import { assertSafeRelativePath, resolveContainedPath } from './sync-splice-dars';
+import { assertSafeRelativePath, normalizeRelativePath, resolveContainedPath } from './sync-splice-dars';
 
 export interface PrepareBuildOptions {
   rootDir: string;
@@ -118,7 +118,15 @@ export function prepareBuild(options: PrepareBuildOptions): string[] {
 
   for (const sourceDir of sourcePackages) {
     assertSafeRelativePath(sourceDir, 'multi-package.yaml packages entry');
-    const sourcePath = resolveContainedPath(rootDir, sourceDir, 'multi-package.yaml packages entry');
+    const normalizedSourceDir = normalizeRelativePath(sourceDir);
+    if (!normalizedSourceDir) {
+      throw new Error(`Unsafe multi-package.yaml packages entry: ${sourceDir}`);
+    }
+    const sourcePath = resolveContainedPath(
+      rootDir,
+      normalizedSourceDir,
+      'multi-package.yaml packages entry'
+    );
     const damlYamlPath = path.join(sourcePath, 'daml.yaml');
     const damlYaml = readYamlFile<DamlYaml>(damlYamlPath);
     if (!damlYaml.name) {
@@ -128,21 +136,18 @@ export function prepareBuild(options: PrepareBuildOptions): string[] {
     for (const [existingSource, existingName] of packageNames) {
       if (existingName === damlYaml.name) {
         throw new Error(
-          `Duplicate daml.yaml name "${damlYaml.name}" in ${sourceDir} and ${existingSource}`
+          `Duplicate daml.yaml name "${damlYaml.name}" in ${normalizedSourceDir} and ${existingSource}`
         );
       }
     }
-    packageNames.set(sourceDir, damlYaml.name);
+    packageNames.set(normalizedSourceDir, damlYaml.name);
   }
 
   fs.rmSync(buildRoot, { recursive: true, force: true });
   fs.mkdirSync(buildRoot, { recursive: true });
 
   const generatedPackages: string[] = [];
-  for (const sourceDir of sourcePackages) {
-    const packageName = packageNames.get(sourceDir);
-    if (!packageName) throw new Error(`Missing package name for ${sourceDir}`);
-
+  for (const [sourceDir, packageName] of packageNames) {
     const sourcePath = resolveContainedPath(rootDir, sourceDir, 'multi-package.yaml packages entry');
     const targetPath = resolveContainedPath(buildRoot, packageName, 'daml.yaml name');
     assertPathInsideRoot(rootDir, targetPath, 'prepare-build target');

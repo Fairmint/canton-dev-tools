@@ -9,7 +9,11 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as yaml from 'yaml';
 import { parseStrictSemver } from './dar-version-policy';
-import { assertSafeRelativePath, resolveContainedPath } from './sync-splice-dars';
+import {
+  assertSafeRelativePath,
+  normalizeRelativePath,
+  resolveContainedPath,
+} from './sync-splice-dars';
 import { isContractNetwork, type ContractNetwork } from './types';
 
 export interface PackageConfig {
@@ -79,7 +83,15 @@ export function discoverPackages(
 
   for (const sourceDir of sourcePackages) {
     assertSafeRelativePath(sourceDir, 'multi-package.yaml packages entry');
-    const sourcePath = resolveContainedPath(rootDir, sourceDir, 'multi-package.yaml packages entry');
+    const normalizedSourceDir = normalizeRelativePath(sourceDir);
+    if (!normalizedSourceDir) {
+      throw new Error(`Unsafe multi-package.yaml packages entry: ${sourceDir}`);
+    }
+    const sourcePath = resolveContainedPath(
+      rootDir,
+      normalizedSourceDir,
+      'multi-package.yaml packages entry'
+    );
     const damlYamlPath = path.join(sourcePath, 'daml.yaml');
     if (!fs.existsSync(damlYamlPath)) {
       throw new Error(`daml.yaml not found: ${damlYamlPath}`);
@@ -96,11 +108,11 @@ export function discoverPackages(
     resolveContainedPath(resolvedBuildRoot, metadata.name, 'daml.yaml name');
 
     const pkg: PackageConfig = {
-      key: packageKeyFromSourceDir(sourceDir),
+      key: packageKeyFromSourceDir(normalizedSourceDir),
       name: metadata.name,
       darName: metadata.name,
       version: metadata.version,
-      sourceDir,
+      sourceDir: normalizedSourceDir,
       buildDir: path.join(buildRoot, metadata.name),
     };
 

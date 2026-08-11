@@ -173,6 +173,15 @@ export function assertSafeRelativePath(relativePath: string, label: string): voi
   }
 }
 
+/** Collapse `.` segments (`./pkg` → `pkg`) after safety checks. */
+export function normalizeRelativePath(relativePath: string): string {
+  return relativePath
+    .replace(/\\/g, '/')
+    .split('/')
+    .filter((part) => part !== '' && part !== '.')
+    .join('/');
+}
+
 export function resolveContainedPath(root: string, relativePath: string, label: string): string {
   assertSafeRelativePath(relativePath, label);
   const resolvedRoot = path.resolve(root);
