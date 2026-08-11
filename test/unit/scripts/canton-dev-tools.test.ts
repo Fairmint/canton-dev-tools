@@ -117,7 +117,7 @@ describe('canton-dev-tools pin ownership', (): void => {
 
 describe('canton-dev-tools command surface', (): void => {
   it('passes current LocalNet command names through without remapping', (): void => {
-    for (const command of ['start', 'readiness', 'diagnostics', 'teardown'] as const) {
+    for (const command of ['readiness', 'diagnostics', 'teardown'] as const) {
       const output = withPackagedBin('printf "%s" "$1"\n', (localnetBin, packageRoot) =>
         execFileSync(localnetBin, [command], {
           encoding: 'utf8',
@@ -130,6 +130,20 @@ describe('canton-dev-tools command surface', (): void => {
       );
       expect(output).toBe(command);
     }
+  });
+
+  it('passes start through after ensuring quickstart checkout', (): void => {
+    const output = withPackagedBin('printf "%s" "$1"\n', (localnetBin, packageRoot) =>
+      execFileSync(localnetBin, ['start'], {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          CANTON_LOCALNET_CACHE_DIR: resolve(packageRoot, 'cache'),
+          HOME: resolve(packageRoot, 'home'),
+        },
+      })
+    );
+    expect(output.trim().split('\n').at(-1)).toBe('start');
   });
 
   it('rejects legacy LocalNet aliases', (): void => {
