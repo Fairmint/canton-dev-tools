@@ -34,22 +34,12 @@ log() {
 usage() {
   cat <<'USAGE'
 Usage: canton-dev-tools <command>
-       canton-localnet <command>
 
 LocalNet commands:
   start         Start lean LocalNet + Keycloak and wait for ready endpoints
-  readiness     Run endpoint readiness / smoke checks
+  readiness     Run endpoint readiness checks
   diagnostics   Show LocalNet diagnostic logs
   teardown      Stop LocalNet services
-
-Legacy LocalNet aliases:
-  setup         Prepare LocalNet prerequisites
-  stop          Alias for teardown
-  logs          Alias for diagnostics
-  status        Show docker + endpoint status
-  smoke         Alias for readiness
-  test          Run project integration tests when configured
-  verify        Run setup + start + readiness + test
 
 DAML package commands (from a multi-package repo root):
   prepare-build
@@ -210,26 +200,8 @@ ensure_quickstart_checkout() {
   log "Cached cn-quickstart at ${root}."
 }
 
-normalize_command() {
-  case "$1" in
-    readiness)
-      printf 'smoke'
-      ;;
-    diagnostics)
-      printf 'logs'
-      ;;
-    teardown)
-      printf 'stop'
-      ;;
-    *)
-      printf '%s' "$1"
-      ;;
-  esac
-}
-
 main() {
   local command="${1:-}"
-  local normalized=""
   local dir=""
 
   case "${command}" in
@@ -252,10 +224,10 @@ main() {
       fi
       exec bash "${INSTALL_DPM_SCRIPT}" "$@"
       ;;
-    start | setup | verify)
+    start)
       ensure_quickstart_checkout
       ;;
-    readiness | diagnostics | teardown | logs | status | stop | smoke | test)
+    readiness | diagnostics | teardown)
       ;;
     *)
       usage
@@ -263,7 +235,6 @@ main() {
       ;;
   esac
 
-  normalized="$(normalize_command "${command}")"
   shift || true
 
   dir="$(quickstart_dir)"
@@ -279,7 +250,7 @@ main() {
   export CANTON_LOCALNET_PROTOCOL_VERSION="${CANTON_LOCALNET_PROTOCOL_VERSION:-${DEFAULT_PROTOCOL_VERSION}}"
   export CANTON_LOCALNET_INFRA_ONLY="${CANTON_LOCALNET_INFRA_ONLY:-true}"
 
-  exec bash "${LOCALNET_SCRIPT}" "${normalized}" "$@"
+  exec bash "${LOCALNET_SCRIPT}" "${command}" "$@"
 }
 
 main "$@"

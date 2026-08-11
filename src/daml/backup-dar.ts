@@ -9,6 +9,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as yaml from 'yaml';
 import {
+  assertGitCommitRef,
   computeSha256,
   darLockEntriesEqual,
   getDarLockKey,
@@ -73,6 +74,8 @@ function deploymentTags(rootDir: string): DeploymentTag[] {
 }
 
 function loadLockAtRef(rootDir: string, ref: string): DarsLock {
+  assertGitCommitRef(rootDir, ref);
+
   try {
     execFileSync('git', ['cat-file', '-e', `${ref}:dars/dars.lock`], {
       cwd: rootDir,

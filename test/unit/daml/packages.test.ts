@@ -2,6 +2,7 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync, existsSync
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
+  assertPathInsideRoot,
   discoverManagedPackages,
   discoverPackages,
   findPackage,
@@ -71,5 +72,18 @@ describe('daml package discovery + prepare-build', (): void => {
       'utf8'
     );
     expect(testDamlYaml).toContain('WrappedAssets-v01');
+  });
+
+  it('rejects build paths that escape the repo root', (): void => {
+    expect(() => assertPathInsideRoot(rootDir, rootDir, 'build root')).toThrow(/inside the repo/);
+    expect(() => assertPathInsideRoot(rootDir, join(rootDir, '..'), 'build root')).toThrow(
+      /inside the repo/
+    );
+    expect(() => assertPathInsideRoot(rootDir, '/tmp/outside', 'build root')).toThrow(
+      /inside the repo/
+    );
+    expect(assertPathInsideRoot(rootDir, join(rootDir, 'generated/build'), 'build root')).toBe(
+      join(rootDir, 'generated/build')
+    );
   });
 });

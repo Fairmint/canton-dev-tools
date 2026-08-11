@@ -11,7 +11,6 @@ import * as yaml from 'yaml';
 
 export interface PrepareBuildOptions {
   rootDir: string;
-  buildRoot?: string;
 }
 
 interface DamlYaml {
@@ -20,6 +19,9 @@ interface DamlYaml {
   'data-dependencies'?: string[];
   codegen?: { js?: { 'output-directory'?: string } };
 }
+
+/** Fixed relative build destination; kept in sync with packages.ts buildDir. */
+const BUILD_ROOT_RELATIVE = 'generated/build';
 
 function readYamlFile<T>(file: string): T {
   return yaml.parse(fs.readFileSync(file, 'utf8')) as T;
@@ -44,11 +46,24 @@ function rewritePackageReferences(value: string, packageNames: Map<string, strin
   return rewritten;
 }
 
+/** Require `candidate` to resolve strictly inside `rootDir` (not the root itself). */
+export function assertPathInsideRoot(rootDir: string, candidate: string, label: string): string {
+  const root = path.resolve(rootDir);
+  const resolved = path.resolve(candidate);
+  if (resolved === root || !resolved.startsWith(`${root}${path.sep}`)) {
+    throw new Error(`${label} must resolve inside the repo root (got ${candidate})`);
+  }
+  return resolved;
+}
+
 export function prepareBuild(options: PrepareBuildOptions): string[] {
   const rootDir = path.resolve(options.rootDir);
-  const buildRootRelative = options.buildRoot ?? 'generated/build';
   const sourceManifest = path.join(rootDir, 'multi-package.yaml');
-  const buildRoot = path.join(rootDir, buildRootRelative);
+  const buildRoot = assertPathInsideRoot(
+    rootDir,
+    path.join(rootDir, BUILD_ROOT_RELATIVE),
+    'build root'
+  );
 
   const manifest = readYamlFile<{ packages?: string[] }>(sourceManifest);
   const sourcePackages = manifest.packages ?? [];

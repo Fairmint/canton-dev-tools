@@ -1086,20 +1086,11 @@ usage() {
   cat <<'USAGE'
 Usage: scripts/localnet-cloud.sh <command>
 
-Product commands:
+Commands:
   start         Start localnet and wait for ready endpoints
-  readiness     Run endpoint readiness / smoke checks
+  readiness     Run endpoint readiness checks
   diagnostics   Show localnet diagnostic logs
   teardown      Stop localnet services
-
-Legacy aliases:
-  setup         Install prerequisites, configure quickstart
-  stop          Alias for teardown
-  logs          Alias for diagnostics
-  status        Show docker + endpoint status
-  smoke         Alias for readiness
-  test          Run project integration tests (if configured)
-  verify        Run setup + start + readiness + test
 
 Environment:
   CANTON_LOCALNET_FAST_START=true|false       Enable fast startup path (default: true)
@@ -1117,14 +1108,6 @@ main() {
   fi
 
   case "$1" in
-    setup)
-      validate_configuration
-      ensure_docker_packages
-      start_docker_daemon
-      ensure_submodules
-      ensure_hosts_entries
-      quickstart_setup
-      ;;
     start)
       validate_configuration
       require_command curl
@@ -1135,34 +1118,15 @@ main() {
       quickstart_setup
       start_localnet
       ;;
-    stop | teardown)
+    teardown)
       stop_localnet
       ;;
-    logs | diagnostics)
+    diagnostics)
       show_localnet_logs
       ;;
-    status)
-      require_command curl
-      status_localnet
-      ;;
-    smoke | readiness)
+    readiness)
       require_command curl
       run_smoke
-      ;;
-    test)
-      run_integration_tests
-      ;;
-    verify)
-      validate_configuration
-      require_command curl
-      ensure_docker_packages
-      start_docker_daemon
-      ensure_submodules
-      ensure_hosts_entries
-      quickstart_setup
-      start_localnet
-      run_smoke
-      run_integration_tests
       ;;
     *)
       usage

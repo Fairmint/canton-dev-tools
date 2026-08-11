@@ -46,9 +46,7 @@ function main(): void {
 
   switch (command) {
     case 'prepare-build': {
-      const rootDir = resolveRoot(args);
-      const buildRoot = parseFlagValue(args, '--build-root') ?? 'generated/build';
-      prepareBuild({ rootDir, buildRoot });
+      prepareBuild({ rootDir: resolveRoot(args) });
       break;
     }
     case 'verify-dars': {

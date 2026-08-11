@@ -38,11 +38,18 @@ export interface SyncSpliceDarsOptions {
   config?: SyncSpliceDarsConfig;
 }
 
+interface SyncState {
+  spliceRef: string;
+  dars: Record<string, string>;
+  adminProtos?: boolean;
+}
+
 const DEFAULT_ADMIN_PROTO_SOURCE_DIR = 'canton/community/admin-api/src/main/protobuf';
 const DEFAULT_ADMIN_PROTO_PACKAGE_SERVICE =
   'com/digitalasset/canton/admin/participant/v30/package_service.proto';
 const DEFAULT_DARS_RELATIVE_DIR = 'libs/splice/daml/dars';
 const DEFAULT_ADMIN_PROTO_RELATIVE_DIR = 'libs/splice/canton/community/admin-api/src/main/protobuf';
+const SYNC_STATE_FILENAME = '.canton-splice-sync-state.json';
 
 function resolveConfigPath(rootDir: string, configPath?: string): string {
   if (configPath) return path.resolve(configPath);
@@ -81,6 +88,7 @@ export function loadSyncSpliceDarsConfig(configPath: string): SyncSpliceDarsConf
     ) {
       throw new Error(`Invalid requiredDars entry in ${configPath}`);
     }
+    assertSafeRelativePath(String(Reflect.get(dar, 'file')), 'requiredDars.file');
   }
   return parsed as SyncSpliceDarsConfig;
 }
@@ -102,6 +110,74 @@ function verifyFile(filePath: string, expectedSha256: string): boolean {
   return fs.existsSync(filePath) && computeSha256(filePath) === expectedSha256;
 }
 
+/** Reject absolute paths and `..` / empty / `.` segments that escape an expected root. */
+export function assertSafeRelativePath(relativePath: string, label: string): void {
+  if (!relativePath || path.isAbsolute(relativePath)) {
+    throw new Error(`Unsafe ${label}: ${relativePath}`);
+  }
+  const normalized = relativePath.replace(/\\/g, '/');
+  const parts = normalized.split('/');
+  if (parts.some((part) => part === '..' || part === '' || part === '.')) {
+    throw new Error(`Unsafe ${label}: ${relativePath}`);
+  }
+}
+
+export function resolveContainedPath(root: string, relativePath: string, label: string): string {
+  assertSafeRelativePath(relativePath, label);
+  const resolvedRoot = path.resolve(root);
+  const resolved = path.resolve(resolvedRoot, relativePath);
+  if (resolved !== resolvedRoot && !resolved.startsWith(`${resolvedRoot}${path.sep}`)) {
+    throw new Error(`Unsafe ${label} escapes root: ${relativePath}`);
+  }
+  return resolved;
+}
+
+function effectiveSpliceRef(config: SyncSpliceDarsConfig): string {
+  return process.env['SPLICE_REF'] ?? config.spliceRef;
+}
+
+function syncStatePath(darsDir: string): string {
+  return path.join(darsDir, SYNC_STATE_FILENAME);
+}
+
+function readSyncState(darsDir: string): SyncState | null {
+  const stateFile = syncStatePath(darsDir);
+  if (!fs.existsSync(stateFile)) return null;
+  try {
+    const parsed: unknown = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return null;
+    const spliceRef = Reflect.get(parsed, 'spliceRef');
+    const dars = Reflect.get(parsed, 'dars');
+    if (typeof spliceRef !== 'string' || typeof dars !== 'object' || dars === null) return null;
+    return parsed as SyncState;
+  } catch {
+    return null;
+  }
+}
+
+function writeSyncState(darsDir: string, config: SyncSpliceDarsConfig): void {
+  const state: SyncState = {
+    spliceRef: effectiveSpliceRef(config),
+    dars: Object.fromEntries(config.requiredDars.map((dar) => [dar.file, dar.sha256])),
+    adminProtos: config.syncAdminProtos !== false,
+  };
+  fs.writeFileSync(syncStatePath(darsDir), `${JSON.stringify(state, null, 2)}\n`);
+}
+
+function syncStateMatches(darsDir: string, config: SyncSpliceDarsConfig): boolean {
+  const state = readSyncState(darsDir);
+  if (!state) return false;
+  if (state.spliceRef !== effectiveSpliceRef(config)) return false;
+  if (Boolean(state.adminProtos) !== (config.syncAdminProtos !== false)) return false;
+  for (const dar of config.requiredDars) {
+    if (state.dars[dar.file] !== dar.sha256) return false;
+  }
+  for (const file of Object.keys(state.dars)) {
+    if (!config.requiredDars.some((dar) => dar.file === file)) return false;
+  }
+  return true;
+}
+
 function checkExistingFiles(
   rootDir: string,
   config: SyncSpliceDarsConfig,
@@ -119,7 +195,7 @@ function checkExistingFiles(
   const errors: string[] = [];
 
   for (const dar of config.requiredDars) {
-    const targetPath = path.join(darsDir, dar.file);
+    const targetPath = resolveContainedPath(darsDir, dar.file, 'requiredDars.file');
 
     if (!fs.existsSync(targetPath)) {
       needsSync = true;
@@ -138,14 +214,20 @@ function checkExistingFiles(
   }
 
   if (errors.length > 0) {
-    console.error(
-      'Splice DAR hash mismatch. Refusing to overwrite existing files without --force.'
+    const details = errors.map((error) => `  - ${error}`).join('\n');
+    throw new Error(
+      `Splice DAR hash mismatch. Refusing to overwrite existing files without --force.\n${details}`
     );
-    for (const error of errors) console.error(`  - ${error}`);
-    process.exit(1);
   }
 
-  if (syncAdminProtos && !fs.existsSync(path.join(adminProtoDir, packageService))) {
+  if (syncAdminProtos) {
+    assertSafeRelativePath(packageService, 'adminProtoPackageService');
+    if (!fs.existsSync(path.join(adminProtoDir, packageService))) {
+      needsSync = true;
+    }
+  }
+
+  if (!syncStateMatches(darsDir, config)) {
     needsSync = true;
   }
 
@@ -157,7 +239,7 @@ function syncSpliceDarsFiles(rootDir: string, config: SyncSpliceDarsConfig): voi
     process.env['SPLICE_REPO'] ??
     config.spliceRepo ??
     'https://github.com/canton-network/splice.git';
-  const spliceRef = process.env['SPLICE_REF'] ?? config.spliceRef;
+  const spliceRef = effectiveSpliceRef(config);
   const darsDir = path.join(rootDir, config.darsRelativeDir ?? DEFAULT_DARS_RELATIVE_DIR);
   const adminProtoDir = path.join(
     rootDir,
@@ -180,8 +262,12 @@ function syncSpliceDarsFiles(rootDir: string, config: SyncSpliceDarsConfig): voi
     fs.mkdirSync(darsDir, { recursive: true });
 
     for (const dar of config.requiredDars) {
-      const sourcePath = path.join(cloneDir, 'daml/dars', dar.file);
-      const targetPath = path.join(darsDir, dar.file);
+      const sourcePath = resolveContainedPath(
+        path.join(cloneDir, 'daml/dars'),
+        dar.file,
+        'requiredDars.file'
+      );
+      const targetPath = resolveContainedPath(darsDir, dar.file, 'requiredDars.file');
 
       if (!fs.existsSync(sourcePath)) {
         throw new Error(`Missing upstream Splice DAR: daml/dars/${dar.file}`);
@@ -194,6 +280,7 @@ function syncSpliceDarsFiles(rootDir: string, config: SyncSpliceDarsConfig): voi
         );
       }
 
+      fs.mkdirSync(path.dirname(targetPath), { recursive: true });
       fs.copyFileSync(sourcePath, targetPath);
       if (!verifyFile(targetPath, dar.sha256)) {
         throw new Error(`Hash mismatch after copying ${dar.file}`);
@@ -201,6 +288,7 @@ function syncSpliceDarsFiles(rootDir: string, config: SyncSpliceDarsConfig): voi
     }
 
     if (syncAdminProtos) {
+      assertSafeRelativePath(packageService, 'adminProtoPackageService');
       const sourceAdminProtoDir = path.join(cloneDir, adminProtoSourceDir);
       const sourcePackageServiceProto = path.join(sourceAdminProtoDir, packageService);
       if (!fs.existsSync(sourcePackageServiceProto)) {
@@ -208,8 +296,13 @@ function syncSpliceDarsFiles(rootDir: string, config: SyncSpliceDarsConfig): voi
           `Missing upstream Canton admin proto: ${adminProtoSourceDir}/${packageService}`
         );
       }
+      // Replace destination so stale upstream deletions do not linger.
+      fs.rmSync(adminProtoDir, { recursive: true, force: true });
+      fs.mkdirSync(adminProtoDir, { recursive: true });
       fs.cpSync(sourceAdminProtoDir, adminProtoDir, { recursive: true });
     }
+
+    writeSyncState(darsDir, config);
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
@@ -227,6 +320,10 @@ export function syncSpliceDars(options: SyncSpliceDarsOptions): void {
   const force = options.force ?? false;
   const config =
     options.config ?? loadSyncSpliceDarsConfig(resolveConfigPath(rootDir, options.configPath));
+
+  for (const dar of config.requiredDars) {
+    assertSafeRelativePath(dar.file, 'requiredDars.file');
+  }
 
   if (!force && !checkExistingFiles(rootDir, config, force)) {
     console.log('Splice DARs already present and verified.');

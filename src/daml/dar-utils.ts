@@ -1,5 +1,6 @@
 /** Shared utilities for DAR file management. Used by upload scripts and backup scripts. */
 
+import { execFileSync } from 'node:child_process';
 import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -82,10 +83,29 @@ export function loadDarsLock(rootDir: string): DarsLock {
   }
 }
 
+/**
+ * Assert that a git ref resolves to a commit in `rootDir`.
+ * Invalid/unavailable refs must fail hard — callers must not treat them as empty history.
+ */
+export function assertGitCommitRef(rootDir: string, ref: string): void {
+  if (!ref) {
+    throw new Error('Git ref is required');
+  }
+  try {
+    execFileSync('git', ['rev-parse', '--verify', `${ref}^{commit}`], {
+      cwd: rootDir,
+      stdio: 'ignore',
+    });
+  } catch {
+    throw new Error(`Git ref not found or unavailable: ${ref}`);
+  }
+}
+
 /** Save the dars.lock file. */
 export function saveDarsLock(rootDir: string, lock: DarsLock): void {
   const lockPath = path.join(getDarsDir(rootDir), 'dars.lock');
   const lockDir = path.dirname(lockPath);
+  fs.mkdirSync(lockDir, { recursive: true });
   const tempPath = path.join(lockDir, `dars.lock.tmp-${process.pid}-${Date.now()}`);
   const data = `${JSON.stringify(lock, null, 2)}\n`;
 

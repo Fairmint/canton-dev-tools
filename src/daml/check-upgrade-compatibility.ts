@@ -5,7 +5,7 @@
  * `multi-package.yaml` (Test packages excluded by default).
  */
 
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { computeSha256, getDarLockKey, getDarsDir, loadDarsLock } from './dar-utils';
@@ -41,15 +41,17 @@ function compareSemver(a: string, b: string): number {
   return 0;
 }
 
-function getBackedUpPackages(
-  rootDir: string
-): Map<string, Array<{ packageName: string; version: string; darPath: string }>> {
+interface BackupRecord {
+  packageName: string;
+  version: string;
+  darPath: string;
+  lockKey: string;
+}
+
+function getBackedUpPackages(rootDir: string): Map<string, BackupRecord[]> {
   const lock = loadDarsLock(rootDir);
   const darsDir = getDarsDir(rootDir);
-  const byPackageName = new Map<
-    string,
-    Array<{ packageName: string; version: string; darPath: string }>
-  >();
+  const byPackageName = new Map<string, BackupRecord[]>();
 
   for (const [lockKey] of Object.entries(lock.packages)) {
     const parts = lockKey.split('/');
@@ -63,25 +65,42 @@ function getBackedUpPackages(
     if (!byPackageName.has(packageName)) {
       byPackageName.set(packageName, []);
     }
-    byPackageName.get(packageName)!.push({ packageName, version, darPath });
+    byPackageName.get(packageName)!.push({ packageName, version, darPath, lockKey });
   }
 
   return byPackageName;
 }
 
-function sortBackupsDesc(
-  backups: Array<{ packageName: string; version: string; darPath: string }>
-): Array<{ packageName: string; version: string; darPath: string }> {
+function sortBackupsDesc(backups: BackupRecord[]): BackupRecord[] {
   return [...backups].sort((a, b) => compareSemver(b.version, a.version));
 }
 
 function getMostRecentOlderBackup(
-  backups: Array<{ packageName: string; version: string; darPath: string }>,
+  backups: BackupRecord[],
   currentVersion: string
-): { packageName: string; version: string; darPath: string } | null {
+): BackupRecord | null {
   const older = backups.filter((b) => compareSemver(currentVersion, b.version) > 0);
   if (older.length === 0) return null;
   return sortBackupsDesc(older)[0] ?? null;
+}
+
+function verifyBackupAgainstLock(rootDir: string, backup: BackupRecord): void {
+  const lock = loadDarsLock(rootDir);
+  const entry = lock.packages[backup.lockKey];
+  if (!entry) {
+    throw new Error(`No dars.lock entry for baseline backup ${backup.lockKey}`);
+  }
+  if (!fs.existsSync(backup.darPath)) {
+    throw new Error(`Baseline backup missing on disk: ${backup.lockKey}`);
+  }
+  const actualHash = computeSha256(backup.darPath);
+  const actualSize = fs.statSync(backup.darPath).size;
+  if (actualHash !== entry.sha256 || actualSize !== entry.size) {
+    throw new Error(
+      `Baseline backup failed integrity check for ${backup.lockKey}: ` +
+        `expected ${entry.sha256}/${entry.size}, got ${actualHash}/${actualSize}`
+    );
+  }
 }
 
 function getCurrentDar(
@@ -125,7 +144,7 @@ function reportUpgradeFailure(packageName: string, baseName: string, output: str
 
 function runUpgradeCheck(oldDar: string, newDar: string): { success: boolean; output: string } {
   try {
-    const output = execSync(`dpm upgrade-check --both "${oldDar}" "${newDar}"`, {
+    const output = execFileSync('dpm', ['upgrade-check', '--both', oldDar, newDar], {
       encoding: 'utf8',
       stdio: ['pipe', 'pipe', 'pipe'],
       env: { ...process.env, PATH: `${process.env['HOME']}/.dpm/bin:${process.env['PATH']}` },
@@ -232,6 +251,14 @@ export function checkUpgradeCompatibility(options: CheckUpgradeCompatibilityOpti
           `⏭️  ${currentPackageName}: Skipping lineage upgrade-check v${upgradeBaseline.version} → v${currentDar.version} (configured skip).\n`
         );
       } else {
+        try {
+          verifyBackupAgainstLock(rootDir, upgradeBaseline);
+        } catch (error) {
+          console.error(`❌ ${error instanceof Error ? error.message : String(error)}\n`);
+          hasFailures = true;
+          checkedCount++;
+          continue;
+        }
         console.log(
           `🔄 Running upgrade-check: v${upgradeBaseline.version} (backup) → v${currentDar.version} (current build)...`
         );
@@ -259,9 +286,9 @@ export function checkUpgradeCompatibility(options: CheckUpgradeCompatibilityOpti
   console.log(`📊 Summary: ${checkedCount} checked, ${skippedCount} skipped`);
 
   if (hasFailures) {
-    console.error('\n❌ Upgrade compatibility check failed!');
-    console.error('   Fix the issues above or bump the major version for breaking changes.');
-    process.exit(1);
+    throw new Error(
+      'Upgrade compatibility check failed! Fix the issues above or bump the major version for breaking changes.'
+    );
   }
 
   console.log('\n✅ All packages are backwards compatible.');
@@ -277,7 +304,7 @@ export function runCheckUpgradeCompatibilityCli(args: string[] = process.argv.sl
     }
     checkUpgradeCompatibility({ rootDir });
   } catch (error) {
-    console.error('Fatal error:', error);
+    console.error('Fatal error:', error instanceof Error ? error.message : error);
     process.exit(1);
   }
 }

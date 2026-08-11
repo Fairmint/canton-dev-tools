@@ -28,8 +28,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "canton-dev-tools": "bin/canton-dev-tools",
-    "canton-localnet": "bin/canton-dev-tools"
+    "canton-dev-tools": "bin/canton-dev-tools"
   },
   "exports": {
     ".": {
@@ -63,7 +62,6 @@
     "localnet": "bash ./bin/canton-dev-tools",
     "localnet:diagnostics": "npm run -s localnet -- diagnostics",
     "localnet:readiness": "npm run -s localnet -- readiness",
-    "localnet:setup": "npm run -s localnet -- setup",
     "localnet:start": "npm run -s localnet -- start",
     "localnet:teardown": "npm run -s localnet -- teardown",
     "fixture:dar-lifecycle:build": "bash scripts/build-dar-lifecycle-fixture.sh",

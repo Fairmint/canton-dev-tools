@@ -28,8 +28,6 @@ npx canton-dev-tools teardown
 
 The binary hardcodes the four LocalNet pins from [COMPATIBILITY.md](./COMPATIBILITY.md). Auth defaults to **oauth2** (Keycloak). Consumer CI that uses HS256 JWTs should set `CANTON_LOCALNET_AUTH_MODE=shared-secret`.
 
-Legacy aliases: `setup`, `stop`, `logs`, `status`, `smoke`, `test`, `verify`.
-
 ## DAML package CLI
 
 Run from a DAML multi-package repo root (`multi-package.yaml` + per-package `daml.yaml`). Packages are discovered automatically — no repo-local `packages.ts` required for these commands. Keep consumer-specific PACKAGE_DEFS / generated npm metadata in the consumer when needed.
