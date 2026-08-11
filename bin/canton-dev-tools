@@ -45,7 +45,7 @@ DAML package commands (from a multi-package repo root):
   prepare-build
   verify-dars [--update]
   backup-dar --package <name> --version <ver>
-  check-dar-version-policy [--all] [--package <name>]
+  check-dar-version-policy [--all] [--package <name>] [--extra-policy-paths <csv>]
   check-upgrade-compat
   sync-splice-dars [--config <path>] [--force]
   install-dpm-sdks

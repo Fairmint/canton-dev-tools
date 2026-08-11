@@ -1,6 +1,6 @@
 {
   "name": "@fairmint/canton-dev-tools",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Shared LocalNet CLI, DAML package tooling, and Canton integration-test helpers for Fairmint",
   "keywords": [
     "canton",

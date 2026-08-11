@@ -38,11 +38,41 @@ npx canton-dev-tools prepare-build
 npx canton-dev-tools verify-dars
 npx canton-dev-tools backup-dar --package WrappedAssets-v01 --version 0.0.1
 npx canton-dev-tools check-dar-version-policy --all
+npx canton-dev-tools check-dar-version-policy --extra-policy-paths scripts/codegen,libs/splice
 npx canton-dev-tools check-upgrade-compat
 npx canton-dev-tools sync-splice-dars
 ```
 
 `backup-dar` / version-policy / upgrade-compat skip `Test` packages by default. Pass `--package` with the daml.yaml name, source dir, or a fuzzy alias (e.g. `wrappedAssets`).
+
+### `check-dar-version-policy` extra watch paths
+
+By default, auto-selection only treats package `daml.yaml` / `daml/` sources and `dars/<package>/`
+backups (plus lock-entry diffs) as package input changes. Repos such as OCP also need shared
+inputs (`scripts/codegen/`, `libs/splice/`) to select packages. Configure extra relative prefixes
+with this precedence (first wins):
+
+1. CLI `--extra-policy-paths <csv>` (repeatable; overrides config entirely, including `[]`)
+2. `package.json` → `cantonDevTools.darVersionPolicyWatchPaths`
+3. repo-root `canton-daml-tooling.json` → `darVersionPolicyWatchPaths`
+4. `[]` (no extra watches)
+
+```json
+{
+  "cantonDevTools": {
+    "darVersionPolicyWatchPaths": ["scripts/codegen", "libs/splice"]
+  }
+}
+```
+
+```json
+{
+  "darVersionPolicyWatchPaths": ["scripts/codegen/", "libs/splice/"]
+}
+```
+
+Paths must be relative and contained (no `..` / absolute escapes). A change under any configured
+prefix selects **all** managed packages for the policy check.
 
 ### `sync-splice-dars` config
 
