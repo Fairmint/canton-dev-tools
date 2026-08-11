@@ -34,7 +34,11 @@ import {
   type DeploymentNetwork,
 } from './dar-version-policy';
 import { discoverManagedPackages, requirePackage, type PackageConfig } from './packages';
-import { resolveContainedPath } from './sync-splice-dars';
+import {
+  assertSafeRelativePath,
+  normalizeRelativePath,
+  resolveContainedPath,
+} from './sync-splice-dars';
 
 export interface CheckDarVersionPolicyOptions {
   rootDir: string;
@@ -42,6 +46,126 @@ export interface CheckDarVersionPolicyOptions {
   base?: string;
   deployment?: DeploymentNetwork;
   packageKey?: string;
+  /**
+   * Extra relative prefixes that count as package input changes for auto-selection.
+   * When omitted (`undefined`), paths are loaded from package.json /
+   * `canton-daml-tooling.json`. Pass an explicit array (including `[]`) to override.
+   */
+  extraPolicyPaths?: string[];
+}
+
+const PACKAGE_JSON_WATCH_PATHS_LABEL = 'package.json cantonDevTools.darVersionPolicyWatchPaths';
+const TOOLING_JSON_WATCH_PATHS_LABEL = 'canton-daml-tooling.json darVersionPolicyWatchPaths';
+const CLI_WATCH_PATHS_LABEL = '--extra-policy-paths';
+
+/** Normalize, validate, and dedupe relative watch prefixes (reject escapes). */
+export function normalizeExtraPolicyWatchPaths(
+  paths: readonly string[],
+  label = 'darVersionPolicyWatchPaths'
+): string[] {
+  const normalized: string[] = [];
+  const seen = new Set<string>();
+  for (const raw of paths) {
+    if (typeof raw !== 'string') {
+      throw new Error(`Invalid ${label} entry (expected string): ${String(raw)}`);
+    }
+    const trimmed = raw.trim();
+    if (!trimmed) continue;
+    // Config often uses directory prefixes with a trailing slash (`scripts/codegen/`).
+    const withoutTrailingSlash = trimmed.replace(/\\/g, '/').replace(/\/+$/, '');
+    if (!withoutTrailingSlash) {
+      throw new Error(`Unsafe ${label}: ${raw}`);
+    }
+    assertSafeRelativePath(withoutTrailingSlash, label);
+    const prefix = normalizeRelativePath(withoutTrailingSlash);
+    if (!prefix) {
+      throw new Error(`Unsafe ${label}: ${raw}`);
+    }
+    // Ensure the normalized form still cannot escape (e.g. after collapsing `.`).
+    assertSafeRelativePath(prefix, label);
+    if (seen.has(prefix)) continue;
+    seen.add(prefix);
+    normalized.push(prefix);
+  }
+  return normalized;
+}
+
+function readStringArrayField(value: unknown, label: string): string[] | undefined {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value) || !value.every((entry) => typeof entry === 'string')) {
+    throw new Error(`Invalid ${label} (expected string[])`);
+  }
+  return value;
+}
+
+function loadWatchPathsFromPackageJson(rootDir: string): string[] | undefined {
+  const packageJsonPath = path.join(rootDir, 'package.json');
+  if (!fs.existsSync(packageJsonPath)) return undefined;
+  const parsed: unknown = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    throw new Error(`Invalid package.json (expected object): ${packageJsonPath}`);
+  }
+  const cantonDevTools = Reflect.get(parsed, 'cantonDevTools');
+  if (cantonDevTools === undefined) return undefined;
+  if (typeof cantonDevTools !== 'object' || cantonDevTools === null || Array.isArray(cantonDevTools)) {
+    throw new Error(`Invalid package.json cantonDevTools (expected object): ${packageJsonPath}`);
+  }
+  return readStringArrayField(
+    Reflect.get(cantonDevTools, 'darVersionPolicyWatchPaths'),
+    PACKAGE_JSON_WATCH_PATHS_LABEL
+  );
+}
+
+function loadWatchPathsFromToolingJson(rootDir: string): string[] | undefined {
+  const toolingPath = path.join(rootDir, 'canton-daml-tooling.json');
+  if (!fs.existsSync(toolingPath)) return undefined;
+  const parsed: unknown = JSON.parse(fs.readFileSync(toolingPath, 'utf8'));
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    throw new Error(`Invalid canton-daml-tooling.json (expected object): ${toolingPath}`);
+  }
+  return readStringArrayField(
+    Reflect.get(parsed, 'darVersionPolicyWatchPaths'),
+    TOOLING_JSON_WATCH_PATHS_LABEL
+  );
+}
+
+/**
+ * Resolve extra DAR policy watch paths.
+ * Precedence: explicit `cliPaths` → `package.json` `cantonDevTools.darVersionPolicyWatchPaths`
+ * → `canton-daml-tooling.json` → `[]`.
+ */
+export function resolveDarVersionPolicyWatchPaths(
+  rootDir: string,
+  cliPaths?: readonly string[]
+): string[] {
+  if (cliPaths !== undefined) {
+    return normalizeExtraPolicyWatchPaths(cliPaths, CLI_WATCH_PATHS_LABEL);
+  }
+  const fromPackageJson = loadWatchPathsFromPackageJson(rootDir);
+  if (fromPackageJson !== undefined) {
+    return normalizeExtraPolicyWatchPaths(fromPackageJson, PACKAGE_JSON_WATCH_PATHS_LABEL);
+  }
+  const fromToolingJson = loadWatchPathsFromToolingJson(rootDir);
+  if (fromToolingJson !== undefined) {
+    return normalizeExtraPolicyWatchPaths(fromToolingJson, TOOLING_JSON_WATCH_PATHS_LABEL);
+  }
+  return [];
+}
+
+/** True when `changedPath` equals or is nested under a normalized watch prefix. */
+export function pathMatchesWatchPrefix(changedPath: string, prefix: string): boolean {
+  const normalizedChanged = changedPath.replace(/\\/g, '/');
+  return normalizedChanged === prefix || normalizedChanged.startsWith(`${prefix}/`);
+}
+
+function changedPathTouchesExtraWatchPaths(
+  changedPaths: readonly string[],
+  extraWatchPaths: readonly string[]
+): boolean {
+  if (extraWatchPaths.length === 0) return false;
+  return changedPaths.some((changedPath) =>
+    extraWatchPaths.some((prefix) => pathMatchesWatchPrefix(changedPath, prefix))
+  );
 }
 
 interface TagRef {
@@ -197,12 +321,18 @@ function freshAndLockedEntry(
   return { key, entry, hash };
 }
 
-function changedPackages(
+/**
+ * Select managed packages whose inputs changed vs `base`.
+ * Extra watch prefixes (codegen, splice libs, …) count as shared package inputs —
+ * a touch under any of them selects every managed package.
+ */
+export function selectChangedPackages(
   rootDir: string,
   base: string,
   currentLock: DarsLock,
   baseLock: DarsLock,
-  allPackages: PackageConfig[]
+  allPackages: PackageConfig[],
+  extraWatchPaths: readonly string[] = []
 ): PackageConfig[] {
   const changedPaths = gitText(rootDir, [
     'diff',
@@ -212,6 +342,9 @@ function changedPackages(
   ])
     .split('\n')
     .filter(Boolean);
+  if (changedPathTouchesExtraWatchPaths(changedPaths, extraWatchPaths)) {
+    return [...allPackages];
+  }
   const lockChanged = changedPaths.includes('dars/dars.lock');
   return allPackages.filter((pkg) => {
     const filesChanged = changedPaths.some(
@@ -454,6 +587,7 @@ function deploymentPreflight(
 export function checkDarVersionPolicy(options: CheckDarVersionPolicyOptions): void {
   const rootDir = path.resolve(options.rootDir);
   const allPackages = discoverManagedPackages(rootDir);
+  const extraWatchPaths = resolveDarVersionPolicyWatchPaths(rootDir, options.extraPolicyPaths);
 
   if (options.deployment) {
     if (!options.packageKey) throw new Error('--deployment requires --package');
@@ -474,7 +608,14 @@ export function checkDarVersionPolicy(options: CheckDarVersionPolicyOptions): vo
   } else if (options.all) {
     packages = allPackages;
   } else {
-    packages = changedPackages(rootDir, base, currentLock, baseLock, allPackages);
+    packages = selectChangedPackages(
+      rootDir,
+      base,
+      currentLock,
+      baseLock,
+      allPackages,
+      extraWatchPaths
+    );
   }
   for (const pkg of packages) {
     if (!parseStrictSemver(pkg.version)) {
@@ -501,6 +642,38 @@ export function checkDarVersionPolicy(options: CheckDarVersionPolicyOptions): vo
   for (const pkg of packages) validatePackage(rootDir, pkg, currentLock, baseLock, base, tagNames);
 }
 
+/** Parse `--extra-policy-paths` (CSV and/or repeatable). `undefined` when the flag is absent. */
+export function parseExtraPolicyPathsArg(args: readonly string[]): string[] | undefined {
+  const collected: string[] = [];
+  let seen = false;
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (arg === undefined) continue;
+    if (arg === '--extra-policy-paths') {
+      seen = true;
+      const value = args[++index] ?? '';
+      collected.push(
+        ...value
+          .split(',')
+          .map((part) => part.trim())
+          .filter(Boolean)
+      );
+      continue;
+    }
+    if (arg.startsWith('--extra-policy-paths=')) {
+      seen = true;
+      collected.push(
+        ...arg
+          .slice('--extra-policy-paths='.length)
+          .split(',')
+          .map((part) => part.trim())
+          .filter(Boolean)
+      );
+    }
+  }
+  return seen ? collected : undefined;
+}
+
 export function runCheckDarVersionPolicyCli(args: string[] = process.argv.slice(2)): void {
   try {
     const options: CheckDarVersionPolicyOptions = {
@@ -508,6 +681,10 @@ export function runCheckDarVersionPolicyCli(args: string[] = process.argv.slice(
       all: args.includes('--all'),
       base: 'origin/main',
     };
+    const extraPolicyPaths = parseExtraPolicyPathsArg(args);
+    if (extraPolicyPaths !== undefined) {
+      options.extraPolicyPaths = extraPolicyPaths;
+    }
     for (let index = 0; index < args.length; index += 1) {
       if (args[index] === '--root') options.rootDir = args[++index] ?? options.rootDir;
       if (args[index] === '--base') options.base = args[++index] ?? '';
@@ -518,6 +695,10 @@ export function runCheckDarVersionPolicyCli(args: string[] = process.argv.slice(
         options.deployment = network;
       }
       if (args[index] === '--package') options.packageKey = args[++index];
+      if (args[index] === '--extra-policy-paths') {
+        // Value consumed by parseExtraPolicyPathsArg; skip the following token here.
+        index += 1;
+      }
     }
     if (!options.base) throw new Error('--base requires a Git ref');
     checkDarVersionPolicy(options);

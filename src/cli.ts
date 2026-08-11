@@ -29,6 +29,13 @@ DAML package commands (run from a multi-package repo root):
 Common options:
   --root <dir>               Repo root (default: cwd)
 
+check-dar-version-policy options:
+  --all                      Check every managed package
+  --package <name>           Check one package
+  --base <ref>               Diff base (default: origin/main)
+  --extra-policy-paths <csv> Extra watch prefixes (repeatable / CSV); overrides config
+  --deployment <net>         DevNet/MainNet preflight (requires --package)
+
 LocalNet commands are handled by the canton-dev-tools shell binary.
 `);
 }

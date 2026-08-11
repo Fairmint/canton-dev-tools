@@ -2,8 +2,19 @@ import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { checkDarVersionPolicy, checkUpgradeCompatibility, saveDarsLock } from '../../../src/daml';
+import { dirname, join } from 'node:path';
+import {
+  checkDarVersionPolicy,
+  checkUpgradeCompatibility,
+  normalizeExtraPolicyWatchPaths,
+  parseExtraPolicyPathsArg,
+  pathMatchesWatchPrefix,
+  resolveDarVersionPolicyWatchPaths,
+  saveDarsLock,
+  selectChangedPackages,
+  loadDarsLock,
+  discoverManagedPackages,
+} from '../../../src/daml';
 
 function sha256(content: string | Buffer): string {
   return createHash('sha256').update(content).digest('hex');
@@ -262,5 +273,152 @@ describe('checkDarVersionPolicy --package', (): void => {
     expect(() =>
       checkDarVersionPolicy({ rootDir, base: 'HEAD', packageKey: 'WrappedAssets-v01' })
     ).toThrow(/invalid version/);
+  });
+});
+
+describe('dar version policy extra watch paths', (): void => {
+  let rootDir = '';
+
+  beforeEach((): void => {
+    rootDir = mkdtempSync(join(tmpdir(), 'canton-dev-tools-policy-watch-'));
+    writePackage(rootDir, 'WrappedAssets-v01', 'WrappedAssets-v01', '0.0.1');
+    writeFileSync(join(rootDir, 'multi-package.yaml'), `packages:\n  - WrappedAssets-v01\n`);
+    mkdirSync(join(rootDir, 'dars'), { recursive: true });
+    saveDarsLock(rootDir, { version: 1, packages: {} });
+    writeFileSync(
+      join(rootDir, 'package.json'),
+      JSON.stringify({ name: 'fixture', version: '0.0.0' }, null, 2)
+    );
+
+    git(rootDir, ['init']);
+    git(rootDir, ['config', 'user.email', 'test@example.com']);
+    git(rootDir, ['config', 'user.name', 'Test']);
+    git(rootDir, ['add', '.']);
+    git(rootDir, ['commit', '-m', 'init']);
+    git(rootDir, ['branch', '-M', 'main']);
+  });
+
+  afterEach((): void => {
+    rmSync(rootDir, { recursive: true, force: true });
+  });
+
+  function baseSha(): string {
+    return execFileSync('git', ['rev-parse', 'HEAD'], { cwd: rootDir, encoding: 'utf8' }).trim();
+  }
+
+  function commitPath(relativePath: string, contents: string): void {
+    const fullPath = join(rootDir, relativePath);
+    mkdirSync(dirname(fullPath), { recursive: true });
+    writeFileSync(fullPath, contents);
+    git(rootDir, ['add', relativePath]);
+    git(rootDir, ['commit', '-m', `add ${relativePath}`]);
+  }
+
+  it('normalizes prefixes, matches nested files, and rejects escapes', (): void => {
+    expect(normalizeExtraPolicyWatchPaths(['scripts/codegen/', './libs/splice'])).toEqual([
+      'scripts/codegen',
+      'libs/splice',
+    ]);
+    expect(pathMatchesWatchPrefix('scripts/codegen/generate.ts', 'scripts/codegen')).toBe(true);
+    expect(pathMatchesWatchPrefix('scripts/codegen', 'scripts/codegen')).toBe(true);
+    expect(pathMatchesWatchPrefix('scripts/codegen-other/x.ts', 'scripts/codegen')).toBe(false);
+    expect(() => normalizeExtraPolicyWatchPaths(['../escape'])).toThrow(/Unsafe/);
+    expect(() => normalizeExtraPolicyWatchPaths(['/abs/path'])).toThrow(/Unsafe/);
+  });
+
+  it('loads watch paths with CLI → package.json → canton-daml-tooling.json precedence', (): void => {
+    writeFileSync(
+      join(rootDir, 'canton-daml-tooling.json'),
+      JSON.stringify({ darVersionPolicyWatchPaths: ['from-tooling'] })
+    );
+    expect(resolveDarVersionPolicyWatchPaths(rootDir)).toEqual(['from-tooling']);
+
+    writeFileSync(
+      join(rootDir, 'package.json'),
+      JSON.stringify({
+        name: 'fixture',
+        cantonDevTools: { darVersionPolicyWatchPaths: ['from-package-json', 'libs/splice/'] },
+      })
+    );
+    expect(resolveDarVersionPolicyWatchPaths(rootDir)).toEqual([
+      'from-package-json',
+      'libs/splice',
+    ]);
+    expect(resolveDarVersionPolicyWatchPaths(rootDir, ['scripts/codegen'])).toEqual([
+      'scripts/codegen',
+    ]);
+    expect(resolveDarVersionPolicyWatchPaths(rootDir, [])).toEqual([]);
+  });
+
+  it('parses --extra-policy-paths as CSV and/or repeatable flags', (): void => {
+    expect(parseExtraPolicyPathsArg(['--all'])).toBeUndefined();
+    expect(parseExtraPolicyPathsArg(['--extra-policy-paths', 'scripts/codegen,libs/splice'])).toEqual(
+      ['scripts/codegen', 'libs/splice']
+    );
+    expect(
+      parseExtraPolicyPathsArg([
+        '--extra-policy-paths',
+        'scripts/codegen',
+        '--extra-policy-paths',
+        'libs/splice',
+      ])
+    ).toEqual(['scripts/codegen', 'libs/splice']);
+    expect(parseExtraPolicyPathsArg(['--extra-policy-paths=a,b'])).toEqual(['a', 'b']);
+  });
+
+  it('selects packages for codegen-only diffs when scripts/codegen is watched', (): void => {
+    const base = baseSha();
+    commitPath('scripts/codegen/generate-captable.ts', 'export {};\n');
+
+    const packages = discoverManagedPackages(rootDir);
+    const lock = loadDarsLock(rootDir);
+    expect(
+      selectChangedPackages(rootDir, base, lock, lock, packages, []).map((pkg) => pkg.name)
+    ).toEqual([]);
+    expect(
+      selectChangedPackages(rootDir, base, lock, lock, packages, ['scripts/codegen']).map(
+        (pkg) => pkg.name
+      )
+    ).toEqual(['WrappedAssets-v01']);
+
+    expect(() => checkDarVersionPolicy({ rootDir, base })).not.toThrow();
+    expect(() =>
+      checkDarVersionPolicy({ rootDir, base, extraPolicyPaths: ['scripts/codegen'] })
+    ).toThrow(/Current package is not backed up/);
+  });
+
+  it('selects packages for libs-only diffs when libs/splice is watched', (): void => {
+    const base = baseSha();
+    commitPath('libs/splice/daml/dars/splice-amulet-0.1.16.dar', 'dar-bytes');
+
+    const packages = discoverManagedPackages(rootDir);
+    const lock = loadDarsLock(rootDir);
+    expect(
+      selectChangedPackages(rootDir, base, lock, lock, packages, []).map((pkg) => pkg.name)
+    ).toEqual([]);
+    expect(
+      selectChangedPackages(rootDir, base, lock, lock, packages, ['libs/splice']).map(
+        (pkg) => pkg.name
+      )
+    ).toEqual(['WrappedAssets-v01']);
+
+    writeFileSync(
+      join(rootDir, 'canton-daml-tooling.json'),
+      JSON.stringify({ darVersionPolicyWatchPaths: ['libs/splice/'] })
+    );
+    expect(() => checkDarVersionPolicy({ rootDir, base })).toThrow(
+      /Current package is not backed up/
+    );
+  });
+
+  it('rejects escaping watch paths from package.json config', (): void => {
+    writeFileSync(
+      join(rootDir, 'package.json'),
+      JSON.stringify({
+        name: 'fixture',
+        cantonDevTools: { darVersionPolicyWatchPaths: ['../../etc/passwd'] },
+      })
+    );
+    expect(() => resolveDarVersionPolicyWatchPaths(rootDir)).toThrow(/Unsafe/);
   });
 });
