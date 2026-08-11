@@ -134,3 +134,43 @@ describe('canton-dev-tools command aliases', (): void => {
     expect(output).toBe(legacyCommand);
   });
 });
+
+describe('canton-dev-tools DAML command dispatch', (): void => {
+  it('documents DAML package commands in --help', (): void => {
+    const help = execFileSync(resolve(REPO_ROOT, 'bin/canton-dev-tools'), ['--help'], {
+      encoding: 'utf8',
+    });
+    expect(help).toContain('prepare-build');
+    expect(help).toContain('sync-splice-dars');
+    expect(help).toContain('install-dpm-sdks');
+  });
+
+  it('dispatches prepare-build to dist/cli.js', (): void => {
+    const packageRoot = mkdtempSync(resolve(tmpdir(), 'canton-dev-tools-daml-cli-'));
+    const localnetBin = resolve(packageRoot, 'bin/canton-dev-tools');
+
+    mkdirSync(resolve(packageRoot, 'bin'), { recursive: true });
+    mkdirSync(resolve(packageRoot, 'dist'), { recursive: true });
+    mkdirSync(resolve(packageRoot, 'scripts'), { recursive: true });
+    copyFileSync(resolve(REPO_ROOT, 'bin/canton-dev-tools'), localnetBin);
+    chmodSync(localnetBin, 0o755);
+    writeFileSync(
+      resolve(packageRoot, 'dist/cli.js'),
+      '#!/usr/bin/env node\nprocess.stdout.write(process.argv.slice(2).join(" "));\n'
+    );
+    writeFileSync(resolve(packageRoot, 'scripts/localnet-cloud.sh'), 'true\n');
+    writeFileSync(
+      resolve(packageRoot, 'scripts/install-dpm-sdks.sh'),
+      '#!/usr/bin/env bash\ntrue\n'
+    );
+
+    try {
+      const output = execFileSync(localnetBin, ['prepare-build', '--root', '/tmp'], {
+        encoding: 'utf8',
+      });
+      expect(output).toBe('prepare-build --root /tmp');
+    } finally {
+      rmSync(packageRoot, { recursive: true, force: true });
+    }
+  });
+});

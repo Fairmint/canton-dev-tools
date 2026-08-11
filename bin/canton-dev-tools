@@ -18,6 +18,8 @@ resolve_script_dir() {
 
 PACKAGE_ROOT="$(cd "$(resolve_script_dir "${BASH_SOURCE[0]}")/.." && pwd)"
 LOCALNET_SCRIPT="${PACKAGE_ROOT}/scripts/localnet-cloud.sh"
+DAML_CLI="${PACKAGE_ROOT}/dist/cli.js"
+INSTALL_DPM_SCRIPT="${PACKAGE_ROOT}/scripts/install-dpm-sdks.sh"
 DEFAULT_QUICKSTART_REPO="https://github.com/digital-asset/cn-quickstart.git"
 # Keep in sync with package.json#config (enforced by scripts/check-package-artifacts.ts).
 DEFAULT_QUICKSTART_REF="2f4edfc17621a7dfb6d44357050c22f4b3914c89"
@@ -34,13 +36,13 @@ usage() {
 Usage: canton-dev-tools <command>
        canton-localnet <command>
 
-Product commands:
+LocalNet commands:
   start         Start lean LocalNet + Keycloak and wait for ready endpoints
   readiness     Run endpoint readiness / smoke checks
   diagnostics   Show LocalNet diagnostic logs
   teardown      Stop LocalNet services
 
-Legacy aliases:
+Legacy LocalNet aliases:
   setup         Prepare LocalNet prerequisites
   stop          Alias for teardown
   logs          Alias for diagnostics
@@ -49,9 +51,18 @@ Legacy aliases:
   test          Run project integration tests when configured
   verify        Run setup + start + readiness + test
 
+DAML package commands (from a multi-package repo root):
+  prepare-build
+  verify-dars [--update]
+  backup-dar --package <name> --version <ver>
+  check-dar-version-policy [--all] [--package <name>]
+  check-upgrade-compat
+  sync-splice-dars [--config <path>] [--force]
+  install-dpm-sdks
+
 One-liners:
   npx @fairmint/canton-dev-tools start
-  npx @fairmint/canton-dev-tools verify
+  npx @fairmint/canton-dev-tools prepare-build
 
 Environment:
   CANTON_LOCALNET_QUICKSTART_DIR     Use an existing cn-quickstart/quickstart directory
@@ -62,7 +73,17 @@ Environment:
   CANTON_LOCALNET_PROTOCOL_VERSION   Canton protocol version (defaults to this package pin)
   CANTON_LOCALNET_AUTH_MODE          oauth2 (package default) or shared-secret
   CANTON_LOCALNET_INFRA_ONLY         Defaults to true for this package binary
+  SPLICE_REF / SPLICE_REPO           Overrides for sync-splice-dars
+  CANTON_SPLICE_DARS_CONFIG          Path to splice-dars.json
 USAGE
+}
+
+run_daml_cli() {
+  if [[ ! -f "${DAML_CLI}" ]]; then
+    log "Missing ${DAML_CLI}. Run npm run build in @fairmint/canton-dev-tools first."
+    exit 1
+  fi
+  exec node "${DAML_CLI}" "$@"
 }
 
 require_command() {
@@ -218,6 +239,18 @@ main() {
         exit 1
       fi
       exit 0
+      ;;
+    prepare-build | verify-dars | backup-dar | check-dar-version-policy | check-upgrade-compat | check-upgrade-compatibility | sync-splice-dars)
+      shift || true
+      run_daml_cli "${command}" "$@"
+      ;;
+    install-dpm-sdks)
+      shift || true
+      if [[ ! -f "${INSTALL_DPM_SCRIPT}" ]]; then
+        log "Missing ${INSTALL_DPM_SCRIPT}"
+        exit 1
+      fi
+      exec bash "${INSTALL_DPM_SCRIPT}" "$@"
       ;;
     start | setup | verify)
       ensure_quickstart_checkout

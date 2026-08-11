@@ -28,12 +28,17 @@ function forbiddenPackagePathReason(packagePath: string): string | null {
 }
 
 describe('package artifact policy', (): void => {
-  it('publishes only bin, scripts/localnet-cloud.sh, and dist/**', (): void => {
+  it('publishes bin, LocalNet + DAML scripts, and dist/**', (): void => {
     const pkg = JSON.parse(readFileSync(resolve(REPO_ROOT, 'package.json'), 'utf8')) as {
       files: string[];
     };
 
-    expect(pkg.files).toEqual(['bin/canton-dev-tools', 'scripts/localnet-cloud.sh', 'dist/**']);
+    expect(pkg.files).toEqual([
+      'bin/canton-dev-tools',
+      'scripts/localnet-cloud.sh',
+      'scripts/install-dpm-sdks.sh',
+      'dist/**',
+    ]);
     expect(pkg.files.join('\n')).not.toMatch(/fixtures|internal|\.dar/);
   });
 
@@ -52,6 +57,7 @@ describe('package artifact policy', (): void => {
     expect(forbiddenPackagePathReason('artifact.dar')).toMatch(/DAR/);
     expect(forbiddenPackagePathReason('bin/canton-dev-tools')).toBeNull();
     expect(forbiddenPackagePathReason('scripts/localnet-cloud.sh')).toBeNull();
+    expect(forbiddenPackagePathReason('scripts/install-dpm-sdks.sh')).toBeNull();
     expect(forbiddenPackagePathReason('dist/index.js')).toBeNull();
   });
 
@@ -61,5 +67,7 @@ describe('package artifact policy', (): void => {
     expect(checker).toContain("packagePath.startsWith('fixtures/')");
     expect(checker).toContain('DEFAULT_SCRIBE_VERSION');
     expect(checker).toContain('DEFAULT_PROTOCOL_VERSION');
+    expect(checker).toContain('dist/cli.js');
+    expect(checker).toContain('scripts/install-dpm-sdks.sh');
   });
 });

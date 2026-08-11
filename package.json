@@ -1,10 +1,11 @@
 {
   "name": "@fairmint/canton-dev-tools",
   "version": "0.1.0",
-  "description": "Shared LocalNet CLI and Canton integration-test helpers for Fairmint",
+  "description": "Shared LocalNet CLI, DAML package tooling, and Canton integration-test helpers for Fairmint",
   "keywords": [
     "canton",
     "localnet",
+    "daml",
     "testing",
     "fairmint"
   ],
@@ -38,11 +39,16 @@
     "./testing": {
       "types": "./dist/testing/index.d.ts",
       "default": "./dist/testing/index.js"
+    },
+    "./daml": {
+      "types": "./dist/daml/index.d.ts",
+      "default": "./dist/daml/index.js"
     }
   },
   "files": [
     "bin/canton-dev-tools",
     "scripts/localnet-cloud.sh",
+    "scripts/install-dpm-sdks.sh",
     "dist/**"
   ],
   "scripts": {
@@ -94,5 +100,8 @@
   },
   "publishConfig": {
     "access": "public"
+  },
+  "dependencies": {
+    "yaml": "2.9.0"
   }
 }

@@ -210,8 +210,12 @@ for (const requiredPath of [
   'dist/index.d.ts',
   'dist/testing/index.js',
   'dist/testing/index.d.ts',
+  'dist/daml/index.js',
+  'dist/daml/index.d.ts',
+  'dist/cli.js',
   'bin/canton-dev-tools',
   'scripts/localnet-cloud.sh',
+  'scripts/install-dpm-sdks.sh',
 ]) {
   if (!packagePaths.has(requiredPath)) {
     errors.push(`package is missing required runtime entry ${requiredPath}`);
