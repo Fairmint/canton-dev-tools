@@ -232,34 +232,37 @@ export function backupDar(options: BackupDarOptions): void {
 
   let replacedBackupPath: string | undefined;
   let stagedPath: string | undefined;
-  if (!bytesMatch) {
-    fs.mkdirSync(path.dirname(destPath), { recursive: true });
-    stagedPath = `${destPath}.tmp-${process.pid}`;
-    fs.copyFileSync(sourcePath, stagedPath);
-    if (fs.existsSync(destPath)) {
-      replacedBackupPath = `${destPath}.previous-${process.pid}`;
-      fs.renameSync(destPath, replacedBackupPath);
-    }
-    fs.renameSync(stagedPath, destPath);
-    lock.packages[lockKey] = {
-      sha256: sourceHash,
-      size: sourceSize,
-      sdkVersion: getSdkVersion(rootDir, pkg.sourceDir),
-      uploadedAt: new Date().toISOString(),
-      networks: [],
-    };
-  }
-
-  lock.packages = Object.fromEntries(
-    Object.entries(lock.packages).sort(([left], [right]) => left.localeCompare(right))
-  );
-
   try {
+    if (!bytesMatch) {
+      fs.mkdirSync(path.dirname(destPath), { recursive: true });
+      stagedPath = `${destPath}.tmp-${process.pid}`;
+      fs.copyFileSync(sourcePath, stagedPath);
+      if (fs.existsSync(destPath)) {
+        replacedBackupPath = `${destPath}.previous-${process.pid}`;
+        fs.renameSync(destPath, replacedBackupPath);
+      }
+      fs.renameSync(stagedPath, destPath);
+      stagedPath = undefined;
+      lock.packages[lockKey] = {
+        sha256: sourceHash,
+        size: sourceSize,
+        sdkVersion: getSdkVersion(rootDir, pkg.sourceDir),
+        uploadedAt: new Date().toISOString(),
+        networks: [],
+      };
+    }
+
+    lock.packages = Object.fromEntries(
+      Object.entries(lock.packages).sort(([left], [right]) => left.localeCompare(right))
+    );
     saveDarsLock(rootDir, lock);
   } catch (error) {
     if (replacedBackupPath) {
       fs.rmSync(destPath, { force: true });
-      fs.renameSync(replacedBackupPath, destPath);
+      if (fs.existsSync(replacedBackupPath)) {
+        fs.renameSync(replacedBackupPath, destPath);
+      }
+      replacedBackupPath = undefined;
     } else if (!existing) {
       fs.rmSync(destPath, { force: true });
     }

@@ -29,10 +29,29 @@ function readYamlFile<T>(file: string): T {
 }
 
 function copyDir(source: string, target: string): void {
+  const assertNoSymlinks = (dir: string): void => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isSymbolicLink()) {
+        throw new Error(
+          `Refusing to copy symlink from package source: ${path.relative(source, fullPath)}`
+        );
+      }
+      if (entry.isDirectory() && entry.name !== '.daml' && entry.name !== 'lib') {
+        assertNoSymlinks(fullPath);
+      }
+    }
+  };
+  assertNoSymlinks(source);
+
   fs.cpSync(source, target, {
     recursive: true,
+    dereference: false,
     filter: (entry) => {
       const relative = path.relative(source, entry);
+      if (fs.lstatSync(entry).isSymbolicLink()) {
+        throw new Error(`Refusing to copy symlink from package source: ${relative || '.'}`);
+      }
       return !relative.split(path.sep).some((part) => part === '.daml' || part === 'lib');
     },
   });
