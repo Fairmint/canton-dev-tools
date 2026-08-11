@@ -1,10 +1,11 @@
 {
   "name": "@fairmint/canton-dev-tools",
   "version": "0.1.0",
-  "description": "Shared LocalNet CLI and Canton integration-test helpers for Fairmint",
+  "description": "Shared LocalNet CLI, DAML package tooling, and Canton integration-test helpers for Fairmint",
   "keywords": [
     "canton",
     "localnet",
+    "daml",
     "testing",
     "fairmint"
   ],
@@ -27,8 +28,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "canton-dev-tools": "bin/canton-dev-tools",
-    "canton-localnet": "bin/canton-dev-tools"
+    "canton-dev-tools": "bin/canton-dev-tools"
   },
   "exports": {
     ".": {
@@ -38,11 +38,16 @@
     "./testing": {
       "types": "./dist/testing/index.d.ts",
       "default": "./dist/testing/index.js"
+    },
+    "./daml": {
+      "types": "./dist/daml/index.d.ts",
+      "default": "./dist/daml/index.js"
     }
   },
   "files": [
     "bin/canton-dev-tools",
     "scripts/localnet-cloud.sh",
+    "scripts/install-dpm-sdks.sh",
     "dist/**"
   ],
   "scripts": {
@@ -57,7 +62,6 @@
     "localnet": "bash ./bin/canton-dev-tools",
     "localnet:diagnostics": "npm run -s localnet -- diagnostics",
     "localnet:readiness": "npm run -s localnet -- readiness",
-    "localnet:setup": "npm run -s localnet -- setup",
     "localnet:start": "npm run -s localnet -- start",
     "localnet:teardown": "npm run -s localnet -- teardown",
     "fixture:dar-lifecycle:build": "bash scripts/build-dar-lifecycle-fixture.sh",
@@ -94,5 +98,8 @@
   },
   "publishConfig": {
     "access": "public"
+  },
+  "dependencies": {
+    "yaml": "2.9.0"
   }
 }

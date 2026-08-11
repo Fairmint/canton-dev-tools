@@ -154,7 +154,7 @@ function verifyPackagedLocalnetBinary(): void {
     const packageRoot = join(tempDir, 'node_modules', '@fairmint', 'canton-dev-tools');
     const binDir = join(tempDir, 'node_modules', '.bin');
     const localnetBin = join(packageRoot, 'bin', 'canton-dev-tools');
-    const localnetSymlink = join(binDir, 'canton-localnet');
+    const localnetSymlink = join(binDir, 'canton-dev-tools');
 
     mkdirSync(packageRoot, { recursive: true });
     mkdirSync(binDir, { recursive: true });
@@ -172,7 +172,7 @@ function verifyPackagedLocalnetBinary(): void {
         HOME: join(tempDir, 'home'),
       },
     });
-    throwIfSpawnFailed('packaged canton-localnet diagnostics', logs);
+    throwIfSpawnFailed('packaged canton-dev-tools diagnostics', logs);
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
   }
@@ -210,8 +210,12 @@ for (const requiredPath of [
   'dist/index.d.ts',
   'dist/testing/index.js',
   'dist/testing/index.d.ts',
+  'dist/daml/index.js',
+  'dist/daml/index.d.ts',
+  'dist/cli.js',
   'bin/canton-dev-tools',
   'scripts/localnet-cloud.sh',
+  'scripts/install-dpm-sdks.sh',
 ]) {
   if (!packagePaths.has(requiredPath)) {
     errors.push(`package is missing required runtime entry ${requiredPath}`);
