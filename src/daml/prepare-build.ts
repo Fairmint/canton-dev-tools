@@ -8,6 +8,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as yaml from 'yaml';
+import { assertSafeRelativePath, resolveContainedPath } from './sync-splice-dars';
 
 export interface PrepareBuildOptions {
   rootDir: string;
@@ -70,11 +71,14 @@ export function prepareBuild(options: PrepareBuildOptions): string[] {
   const packageNames = new Map<string, string>();
 
   for (const sourceDir of sourcePackages) {
-    const damlYamlPath = path.join(rootDir, sourceDir, 'daml.yaml');
+    assertSafeRelativePath(sourceDir, 'multi-package.yaml packages entry');
+    const sourcePath = resolveContainedPath(rootDir, sourceDir, 'multi-package.yaml packages entry');
+    const damlYamlPath = path.join(sourcePath, 'daml.yaml');
     const damlYaml = readYamlFile<DamlYaml>(damlYamlPath);
     if (!damlYaml.name) {
       throw new Error(`${damlYamlPath} is missing required name field`);
     }
+    assertSafeRelativePath(damlYaml.name, 'daml.yaml name');
     packageNames.set(sourceDir, damlYaml.name);
   }
 
@@ -86,8 +90,9 @@ export function prepareBuild(options: PrepareBuildOptions): string[] {
     const packageName = packageNames.get(sourceDir);
     if (!packageName) throw new Error(`Missing package name for ${sourceDir}`);
 
-    const sourcePath = path.join(rootDir, sourceDir);
-    const targetPath = path.join(buildRoot, packageName);
+    const sourcePath = resolveContainedPath(rootDir, sourceDir, 'multi-package.yaml packages entry');
+    const targetPath = resolveContainedPath(buildRoot, packageName, 'daml.yaml name');
+    assertPathInsideRoot(rootDir, targetPath, 'prepare-build target');
     copyDir(sourcePath, targetPath);
 
     const targetDamlYamlPath = path.join(targetPath, 'daml.yaml');

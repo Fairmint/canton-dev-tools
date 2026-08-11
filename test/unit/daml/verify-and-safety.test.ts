@@ -6,7 +6,9 @@ import { join } from 'node:path';
 import {
   assertGitCommitRef,
   assertSafeRelativePath,
+  DarIntegrityError,
   loadSyncSpliceDarsConfig,
+  requireBackedUpDar,
   resolveContainedPath,
   saveDarsLock,
   syncSpliceDars,
@@ -164,6 +166,33 @@ describe('saveDarsLock', (): void => {
       expect(existsSync(join(rootDir, 'dars'))).toBe(false);
       saveDarsLock(rootDir, { version: 1, packages: {} });
       expect(existsSync(join(rootDir, 'dars', 'dars.lock'))).toBe(true);
+    } finally {
+      rmSync(rootDir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('requireBackedUpDar', (): void => {
+  it('throws instead of exiting when the backup is missing or corrupt', (): void => {
+    const rootDir = mkdtempSync(join(tmpdir(), 'canton-dev-tools-require-dar-'));
+    try {
+      expect(() => requireBackedUpDar(rootDir, 'Pkg', '0.0.1', 'Pkg')).toThrow(/DAR not backed up/);
+
+      mkdirSync(join(rootDir, 'dars', 'Pkg', '0.0.1'), { recursive: true });
+      writeFileSync(join(rootDir, 'dars', 'Pkg', '0.0.1', 'Pkg.dar'), 'tampered');
+      saveDarsLock(rootDir, {
+        version: 1,
+        packages: {
+          'Pkg/0.0.1/Pkg.dar': {
+            sha256: sha256('expected'),
+            size: 8,
+            sdkVersion: '3.5.2',
+            uploadedAt: '2026-01-01T00:00:00.000Z',
+            networks: [],
+          },
+        },
+      });
+      expect(() => requireBackedUpDar(rootDir, 'Pkg', '0.0.1', 'Pkg')).toThrow(DarIntegrityError);
     } finally {
       rmSync(rootDir, { recursive: true, force: true });
     }

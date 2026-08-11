@@ -240,15 +240,14 @@ export function requireBackedUpDar(
     if (error instanceof DarIntegrityError) {
       console.error(`❌ ${error.message}`);
       console.error('   This is a security concern. Please investigate before proceeding.');
-      process.exit(1);
+      throw error;
     }
     throw error;
   }
 
-  console.error(`❌ DAR not backed up: ${packageName} v${version}`);
-  console.error('   Backups are required before upload to ensure reproducibility.');
-  console.error(
-    `   Run first: canton-dev-tools backup-dar --package ${packageName} --version ${version}`
+  throw new Error(
+    `DAR not backed up: ${packageName} v${version}. ` +
+      'Backups are required before upload to ensure reproducibility. ' +
+      `Run first: canton-dev-tools backup-dar --package ${packageName} --version ${version}`
   );
-  process.exit(1);
 }

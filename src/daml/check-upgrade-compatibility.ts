@@ -142,6 +142,14 @@ function reportUpgradeFailure(packageName: string, baseName: string, output: str
   console.error(`   upgrade-package --package ${baseName} --type major\n`);
 }
 
+function isMissingDpmError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const execError = error as { code?: unknown; errno?: unknown; message?: unknown };
+  if (execError.code === 'ENOENT' || execError.errno === 'ENOENT') return true;
+  const message = typeof execError.message === 'string' ? execError.message : '';
+  return /\bENOENT\b/.test(message) && /\bdpm\b/i.test(message);
+}
+
 function runUpgradeCheck(oldDar: string, newDar: string): { success: boolean; output: string } {
   try {
     const output = execFileSync('dpm', ['upgrade-check', '--both', oldDar, newDar], {
@@ -151,6 +159,11 @@ function runUpgradeCheck(oldDar: string, newDar: string): { success: boolean; ou
     });
     return { success: true, output };
   } catch (error: unknown) {
+    if (isMissingDpmError(error)) {
+      throw new Error(
+        'dpm not found on PATH (also checked ~/.dpm/bin). Install the Daml SDK / dpm before running upgrade-check.'
+      );
+    }
     const execError = error as { stdout?: string; stderr?: string };
     return {
       success: false,
