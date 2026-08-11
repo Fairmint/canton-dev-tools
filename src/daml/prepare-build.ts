@@ -88,11 +88,10 @@ export function assertPathInsideRoot(rootDir: string, candidate: string, label: 
 export function prepareBuild(options: PrepareBuildOptions): string[] {
   const rootDir = path.resolve(options.rootDir);
   const sourceManifest = path.join(rootDir, 'multi-package.yaml');
-  const buildRoot = assertPathInsideRoot(
-    rootDir,
-    path.join(rootDir, BUILD_ROOT_RELATIVE),
-    'build root'
-  );
+  // Symlink-aware: reject a `generated` (or nested) symlink that escapes the repo
+  // before recursive rmSync/mkdirSync.
+  const buildRoot = resolveContainedPath(rootDir, BUILD_ROOT_RELATIVE, 'build root');
+  assertPathInsideRoot(rootDir, buildRoot, 'build root');
 
   const manifest = readYamlFile<{ packages?: string[] }>(sourceManifest);
   const sourcePackages = manifest.packages ?? [];

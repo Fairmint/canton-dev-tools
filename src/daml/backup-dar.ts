@@ -37,6 +37,7 @@ import {
   parseVersionArg,
   type PackageConfig,
 } from './packages';
+import { resolveContainedPath } from './sync-splice-dars';
 
 export interface BackupDarOptions {
   rootDir: string;
@@ -119,11 +120,7 @@ function migrationCandidateVersion(
 }
 
 function safeDarPath(rootDir: string, lockKey: string): string {
-  const darsDir = path.resolve(getDarsDir(rootDir));
-  const darPath = path.resolve(darsDir, lockKey);
-  if (!darPath.startsWith(`${darsDir}${path.sep}`))
-    throw new Error(`Unsafe DAR lock key: ${lockKey}`);
-  return darPath;
+  return resolveContainedPath(getDarsDir(rootDir), lockKey, 'DAR lock key');
 }
 
 export function backupDar(options: BackupDarOptions): void {
