@@ -276,7 +276,11 @@ function writeSyncState(
     dars: Object.fromEntries(config.requiredDars.map((dar) => [dar.file, dar.sha256])),
     adminProtos,
   };
-  fs.writeFileSync(syncStatePath(darsDir), `${JSON.stringify(state, null, 2)}\n`);
+  const stateFile = syncStatePath(darsDir);
+  if (fs.existsSync(stateFile) && fs.lstatSync(stateFile).isSymbolicLink()) {
+    throw new Error(`Refusing to write sync state through symlink: ${stateFile}`);
+  }
+  fs.writeFileSync(stateFile, `${JSON.stringify(state, null, 2)}\n`);
 }
 
 function syncStateMatches(

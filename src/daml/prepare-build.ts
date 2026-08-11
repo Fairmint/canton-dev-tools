@@ -125,6 +125,13 @@ export function prepareBuild(options: PrepareBuildOptions): string[] {
       throw new Error(`${damlYamlPath} is missing required name field`);
     }
     assertSafeRelativePath(damlYaml.name, 'daml.yaml name');
+    for (const [existingSource, existingName] of packageNames) {
+      if (existingName === damlYaml.name) {
+        throw new Error(
+          `Duplicate daml.yaml name "${damlYaml.name}" in ${sourceDir} and ${existingSource}`
+        );
+      }
+    }
     packageNames.set(sourceDir, damlYaml.name);
   }
 
