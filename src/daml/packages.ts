@@ -107,6 +107,13 @@ export function discoverPackages(
     // Ensure derived buildDir stays under buildRoot (name already path-safe).
     resolveContainedPath(resolvedBuildRoot, metadata.name, 'daml.yaml name');
 
+    const duplicate = packages.find((pkg) => pkg.name === metadata.name);
+    if (duplicate) {
+      throw new Error(
+        `Duplicate daml.yaml name "${metadata.name}" in ${normalizedSourceDir} and ${duplicate.sourceDir}`
+      );
+    }
+
     const pkg: PackageConfig = {
       key: packageKeyFromSourceDir(normalizedSourceDir),
       name: metadata.name,
