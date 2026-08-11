@@ -7,6 +7,7 @@ import {
   assertGitCommitRef,
   assertSafeRelativePath,
   DarIntegrityError,
+  hashDirectoryTree,
   loadSyncSpliceDarsConfig,
   requireBackedUpDar,
   resolveContainedPath,
@@ -146,6 +147,40 @@ describe('sync-splice-dars path safety', (): void => {
         })
       );
       expect(() => loadSyncSpliceDarsConfig(configPath)).toThrow(/Unsafe adminProtoRelativeDir/);
+    } finally {
+      rmSync(rootDir, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects non-boolean syncAdminProtos values', (): void => {
+    const rootDir = mkdtempSync(join(tmpdir(), 'canton-dev-tools-sync-bool-'));
+    try {
+      const configPath = join(rootDir, 'splice-dars.json');
+      writeFileSync(
+        configPath,
+        JSON.stringify({
+          spliceRef: 'v1',
+          requiredDars: [{ file: 'a.dar', sha256: 'abc' }],
+          syncAdminProtos: 'false',
+        })
+      );
+      expect(() => loadSyncSpliceDarsConfig(configPath)).toThrow(/Invalid syncAdminProtos/);
+    } finally {
+      rmSync(rootDir, { recursive: true, force: true });
+    }
+  });
+
+  it('hashes admin-proto trees deterministically', (): void => {
+    const rootDir = mkdtempSync(join(tmpdir(), 'canton-dev-tools-tree-hash-'));
+    try {
+      mkdirSync(join(rootDir, 'nested'), { recursive: true });
+      writeFileSync(join(rootDir, 'a.proto'), 'alpha\n');
+      writeFileSync(join(rootDir, 'nested', 'b.proto'), 'beta\n');
+      const first = hashDirectoryTree(rootDir);
+      const second = hashDirectoryTree(rootDir);
+      expect(first).toBe(second);
+      writeFileSync(join(rootDir, 'nested', 'b.proto'), 'changed\n');
+      expect(hashDirectoryTree(rootDir)).not.toBe(first);
     } finally {
       rmSync(rootDir, { recursive: true, force: true });
     }

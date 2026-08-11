@@ -38,10 +38,19 @@ export interface SyncSpliceDarsOptions {
   config?: SyncSpliceDarsConfig;
 }
 
+interface AdminProtoSyncState {
+  enabled: boolean;
+  relativeDir?: string;
+  sourceDir?: string;
+  packageService?: string;
+  treeSha256?: string;
+}
+
 interface SyncState {
   spliceRef: string;
   dars: Record<string, string>;
-  adminProtos?: boolean;
+  /** Legacy boolean form is treated as stale and forces a re-sync. */
+  adminProtos?: boolean | AdminProtoSyncState;
 }
 
 const DEFAULT_ADMIN_PROTO_SOURCE_DIR = 'canton/community/admin-api/src/main/protobuf';
@@ -104,6 +113,10 @@ export function loadSyncSpliceDarsConfig(configPath: string): SyncSpliceDarsConf
       assertSafeRelativePath(value, label);
     }
   }
+  const syncAdminProtos = Reflect.get(parsed, 'syncAdminProtos');
+  if (syncAdminProtos !== undefined && typeof syncAdminProtos !== 'boolean') {
+    throw new Error(`Invalid syncAdminProtos in ${configPath} (expected boolean)`);
+  }
   return parsed as SyncSpliceDarsConfig;
 }
 
@@ -117,6 +130,29 @@ function runGit(args: string[], cwd?: string): void {
 function computeSha256(filePath: string): string {
   const hash = crypto.createHash('sha256');
   hash.update(fs.readFileSync(filePath));
+  return hash.digest('hex');
+}
+
+/** Deterministic digest of a directory tree (paths + file hashes). */
+export function hashDirectoryTree(rootDir: string): string {
+  const hash = crypto.createHash('sha256');
+  const walk = (dir: string, relative: string): void => {
+    if (!fs.existsSync(dir)) return;
+    const entries = fs
+      .readdirSync(dir, { withFileTypes: true })
+      .sort((left, right) => left.name.localeCompare(right.name));
+    for (const entry of entries) {
+      const rel = relative ? `${relative}/${entry.name}` : entry.name;
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        hash.update(`d:${rel}\n`);
+        walk(fullPath, rel);
+      } else if (entry.isFile()) {
+        hash.update(`f:${rel}:${computeSha256(fullPath)}\n`);
+      }
+    }
+  };
+  walk(rootDir, '');
   return hash.digest('hex');
 }
 
@@ -184,27 +220,73 @@ function readSyncState(darsDir: string): SyncState | null {
   }
 }
 
-function writeSyncState(darsDir: string, config: SyncSpliceDarsConfig): void {
+function adminProtoConfigSnapshot(config: SyncSpliceDarsConfig): {
+  relativeDir: string;
+  sourceDir: string;
+  packageService: string;
+} {
+  return {
+    relativeDir: config.adminProtoRelativeDir || DEFAULT_ADMIN_PROTO_RELATIVE_DIR,
+    sourceDir: config.adminProtoSourceDir || DEFAULT_ADMIN_PROTO_SOURCE_DIR,
+    packageService: config.adminProtoPackageService || DEFAULT_ADMIN_PROTO_PACKAGE_SERVICE,
+  };
+}
+
+function writeSyncState(
+  darsDir: string,
+  config: SyncSpliceDarsConfig,
+  adminProtoDir: string | null
+): void {
+  const enabled = config.syncAdminProtos !== false;
+  let adminProtos: AdminProtoSyncState = { enabled: false };
+  if (enabled && adminProtoDir) {
+    const snapshot = adminProtoConfigSnapshot(config);
+    adminProtos = {
+      enabled: true,
+      ...snapshot,
+      treeSha256: hashDirectoryTree(adminProtoDir),
+    };
+  }
   const state: SyncState = {
     spliceRef: effectiveSpliceRef(config),
     dars: Object.fromEntries(config.requiredDars.map((dar) => [dar.file, dar.sha256])),
-    adminProtos: config.syncAdminProtos !== false,
+    adminProtos,
   };
   fs.writeFileSync(syncStatePath(darsDir), `${JSON.stringify(state, null, 2)}\n`);
 }
 
-function syncStateMatches(darsDir: string, config: SyncSpliceDarsConfig): boolean {
+function syncStateMatches(
+  darsDir: string,
+  adminProtoDir: string | null,
+  config: SyncSpliceDarsConfig
+): boolean {
   const state = readSyncState(darsDir);
   if (!state) return false;
   if (state.spliceRef !== effectiveSpliceRef(config)) return false;
-  if (Boolean(state.adminProtos) !== (config.syncAdminProtos !== false)) return false;
   for (const dar of config.requiredDars) {
     if (state.dars[dar.file] !== dar.sha256) return false;
   }
   for (const file of Object.keys(state.dars)) {
     if (!config.requiredDars.some((dar) => dar.file === file)) return false;
   }
-  return true;
+
+  const enabled = config.syncAdminProtos !== false;
+  const recorded = state.adminProtos;
+  // Legacy boolean state (or missing digest) forces a refresh.
+  if (typeof recorded !== 'object' || recorded === null) return false;
+  if (recorded.enabled !== enabled) return false;
+  if (!enabled) return true;
+  if (!adminProtoDir) return false;
+  const snapshot = adminProtoConfigSnapshot(config);
+  if (
+    recorded.relativeDir !== snapshot.relativeDir ||
+    recorded.sourceDir !== snapshot.sourceDir ||
+    recorded.packageService !== snapshot.packageService ||
+    !recorded.treeSha256
+  ) {
+    return false;
+  }
+  return recorded.treeSha256 === hashDirectoryTree(adminProtoDir);
 }
 
 function checkExistingFiles(
@@ -267,7 +349,7 @@ function checkExistingFiles(
     }
   }
 
-  if (!syncStateMatches(darsDir, config)) {
+  if (!syncStateMatches(darsDir, syncAdminProtos ? adminProtoDir : null, config)) {
     needsSync = true;
   }
 
@@ -364,7 +446,7 @@ function syncSpliceDarsFiles(rootDir: string, config: SyncSpliceDarsConfig): voi
       fs.cpSync(sourceAdminProtoDir, adminProtoDir, { recursive: true });
     }
 
-    writeSyncState(darsDir, config);
+    writeSyncState(darsDir, config, syncAdminProtos ? adminProtoDir : null);
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
