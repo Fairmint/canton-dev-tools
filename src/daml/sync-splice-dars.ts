@@ -90,6 +90,20 @@ export function loadSyncSpliceDarsConfig(configPath: string): SyncSpliceDarsConf
     }
     assertSafeRelativePath(String(Reflect.get(dar, 'file')), 'requiredDars.file');
   }
+  for (const [key, label] of [
+    ['darsRelativeDir', 'darsRelativeDir'],
+    ['adminProtoRelativeDir', 'adminProtoRelativeDir'],
+    ['adminProtoSourceDir', 'adminProtoSourceDir'],
+    ['adminProtoPackageService', 'adminProtoPackageService'],
+  ] as const) {
+    const value = Reflect.get(parsed, key);
+    if (value !== undefined) {
+      if (typeof value !== 'string') {
+        throw new Error(`Invalid ${label} in ${configPath}`);
+      }
+      assertSafeRelativePath(value, label);
+    }
+  }
   return parsed as SyncSpliceDarsConfig;
 }
 
@@ -128,6 +142,21 @@ export function resolveContainedPath(root: string, relativePath: string, label: 
   const resolved = path.resolve(resolvedRoot, relativePath);
   if (resolved !== resolvedRoot && !resolved.startsWith(`${resolvedRoot}${path.sep}`)) {
     throw new Error(`Unsafe ${label} escapes root: ${relativePath}`);
+  }
+  return resolved;
+}
+
+/** Resolve a config-relative directory that must stay strictly inside `root`. */
+function resolveSyncRelativeDir(
+  root: string,
+  relativeDir: string | undefined,
+  fallback: string,
+  label: string
+): string {
+  const relative = relativeDir || fallback;
+  const resolved = resolveContainedPath(root, relative, label);
+  if (resolved === path.resolve(root)) {
+    throw new Error(`Unsafe ${label}: ${relative}`);
   }
   return resolved;
 }
@@ -183,12 +212,19 @@ function checkExistingFiles(
   config: SyncSpliceDarsConfig,
   force: boolean
 ): boolean {
-  const darsDir = path.join(rootDir, config.darsRelativeDir ?? DEFAULT_DARS_RELATIVE_DIR);
-  const adminProtoDir = path.join(
+  const darsDir = resolveSyncRelativeDir(
     rootDir,
-    config.adminProtoRelativeDir ?? DEFAULT_ADMIN_PROTO_RELATIVE_DIR
+    config.darsRelativeDir,
+    DEFAULT_DARS_RELATIVE_DIR,
+    'darsRelativeDir'
   );
-  const packageService = config.adminProtoPackageService ?? DEFAULT_ADMIN_PROTO_PACKAGE_SERVICE;
+  const adminProtoDir = resolveSyncRelativeDir(
+    rootDir,
+    config.adminProtoRelativeDir,
+    DEFAULT_ADMIN_PROTO_RELATIVE_DIR,
+    'adminProtoRelativeDir'
+  );
+  const packageService = config.adminProtoPackageService || DEFAULT_ADMIN_PROTO_PACKAGE_SERVICE;
   const syncAdminProtos = config.syncAdminProtos !== false;
 
   let needsSync = false;
@@ -221,8 +257,12 @@ function checkExistingFiles(
   }
 
   if (syncAdminProtos) {
-    assertSafeRelativePath(packageService, 'adminProtoPackageService');
-    if (!fs.existsSync(path.join(adminProtoDir, packageService))) {
+    const packageServicePath = resolveContainedPath(
+      adminProtoDir,
+      packageService,
+      'adminProtoPackageService'
+    );
+    if (!fs.existsSync(packageServicePath)) {
       needsSync = true;
     }
   }
@@ -240,14 +280,26 @@ function syncSpliceDarsFiles(rootDir: string, config: SyncSpliceDarsConfig): voi
     config.spliceRepo ??
     'https://github.com/canton-network/splice.git';
   const spliceRef = effectiveSpliceRef(config);
-  const darsDir = path.join(rootDir, config.darsRelativeDir ?? DEFAULT_DARS_RELATIVE_DIR);
-  const adminProtoDir = path.join(
+  const darsDir = resolveSyncRelativeDir(
     rootDir,
-    config.adminProtoRelativeDir ?? DEFAULT_ADMIN_PROTO_RELATIVE_DIR
+    config.darsRelativeDir,
+    DEFAULT_DARS_RELATIVE_DIR,
+    'darsRelativeDir'
   );
-  const adminProtoSourceDir = config.adminProtoSourceDir ?? DEFAULT_ADMIN_PROTO_SOURCE_DIR;
-  const packageService = config.adminProtoPackageService ?? DEFAULT_ADMIN_PROTO_PACKAGE_SERVICE;
+  const adminProtoDir = resolveSyncRelativeDir(
+    rootDir,
+    config.adminProtoRelativeDir,
+    DEFAULT_ADMIN_PROTO_RELATIVE_DIR,
+    'adminProtoRelativeDir'
+  );
+  const adminProtoSourceRelative =
+    config.adminProtoSourceDir || DEFAULT_ADMIN_PROTO_SOURCE_DIR;
+  const packageService = config.adminProtoPackageService || DEFAULT_ADMIN_PROTO_PACKAGE_SERVICE;
   const syncAdminProtos = config.syncAdminProtos !== false;
+
+  // Validate source/package paths before any clone or filesystem mutation.
+  assertSafeRelativePath(adminProtoSourceRelative, 'adminProtoSourceDir');
+  assertSafeRelativePath(packageService, 'adminProtoPackageService');
 
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'canton-dev-tools-splice-dars-'));
   const cloneDir = path.join(tempDir, 'splice');
@@ -256,7 +308,9 @@ function syncSpliceDarsFiles(rootDir: string, config: SyncSpliceDarsConfig): voi
     console.log(`Fetching Splice DARs from ${spliceRepo} at ${spliceRef}`);
     runGit(['clone', '--filter=blob:none', '--sparse', '--no-checkout', spliceRepo, cloneDir]);
     runGit(['checkout', spliceRef], cloneDir);
-    const sparsePaths = syncAdminProtos ? ['daml/dars', adminProtoSourceDir] : ['daml/dars'];
+    const sparsePaths = syncAdminProtos
+      ? ['daml/dars', adminProtoSourceRelative]
+      : ['daml/dars'];
     runGit(['sparse-checkout', 'set', ...sparsePaths], cloneDir);
 
     fs.mkdirSync(darsDir, { recursive: true });
@@ -288,15 +342,23 @@ function syncSpliceDarsFiles(rootDir: string, config: SyncSpliceDarsConfig): voi
     }
 
     if (syncAdminProtos) {
-      assertSafeRelativePath(packageService, 'adminProtoPackageService');
-      const sourceAdminProtoDir = path.join(cloneDir, adminProtoSourceDir);
-      const sourcePackageServiceProto = path.join(sourceAdminProtoDir, packageService);
+      const sourceAdminProtoDir = resolveContainedPath(
+        cloneDir,
+        adminProtoSourceRelative,
+        'adminProtoSourceDir'
+      );
+      const sourcePackageServiceProto = resolveContainedPath(
+        sourceAdminProtoDir,
+        packageService,
+        'adminProtoPackageService'
+      );
       if (!fs.existsSync(sourcePackageServiceProto)) {
         throw new Error(
-          `Missing upstream Canton admin proto: ${adminProtoSourceDir}/${packageService}`
+          `Missing upstream Canton admin proto: ${adminProtoSourceRelative}/${packageService}`
         );
       }
       // Replace destination so stale upstream deletions do not linger.
+      // adminProtoDir was containment-checked above before any delete.
       fs.rmSync(adminProtoDir, { recursive: true, force: true });
       fs.mkdirSync(adminProtoDir, { recursive: true });
       fs.cpSync(sourceAdminProtoDir, adminProtoDir, { recursive: true });

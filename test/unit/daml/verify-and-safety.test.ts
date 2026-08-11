@@ -6,8 +6,10 @@ import { join } from 'node:path';
 import {
   assertGitCommitRef,
   assertSafeRelativePath,
+  loadSyncSpliceDarsConfig,
   resolveContainedPath,
   saveDarsLock,
+  syncSpliceDars,
   verifyDars,
   type DarsLock,
 } from '../../../src/daml';
@@ -97,6 +99,8 @@ describe('path containment helpers', (): void => {
     expect(() => assertSafeRelativePath('nested/../escape.dar', 'requiredDars.file')).toThrow(
       /Unsafe/
     );
+    expect(() => assertSafeRelativePath('.', 'darsRelativeDir')).toThrow(/Unsafe/);
+    expect(() => assertSafeRelativePath('..', 'adminProtoRelativeDir')).toThrow(/Unsafe/);
     expect(() => assertSafeRelativePath('ok/file.dar', 'requiredDars.file')).not.toThrow();
   });
 
@@ -107,6 +111,48 @@ describe('path containment helpers', (): void => {
       expect(() => resolveContainedPath(root, '../b.dar', 'file')).toThrow(/Unsafe/);
     } finally {
       rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('sync-splice-dars path safety', (): void => {
+  it('rejects unsafe directory fields in config JSON', (): void => {
+    const rootDir = mkdtempSync(join(tmpdir(), 'canton-dev-tools-sync-cfg-'));
+    try {
+      const configPath = join(rootDir, 'splice-dars.json');
+      writeFileSync(
+        configPath,
+        JSON.stringify({
+          spliceRef: 'v1',
+          requiredDars: [{ file: 'a.dar', sha256: 'abc' }],
+          adminProtoRelativeDir: '..',
+        })
+      );
+      expect(() => loadSyncSpliceDarsConfig(configPath)).toThrow(/Unsafe adminProtoRelativeDir/);
+    } finally {
+      rmSync(rootDir, { recursive: true, force: true });
+    }
+  });
+
+  it('refuses sync when adminProtoRelativeDir would wipe the repo root', (): void => {
+    const rootDir = mkdtempSync(join(tmpdir(), 'canton-dev-tools-sync-rm-'));
+    try {
+      const marker = join(rootDir, 'keep-me.txt');
+      writeFileSync(marker, 'safe\n');
+      expect(() =>
+        syncSpliceDars({
+          rootDir,
+          force: true,
+          config: {
+            spliceRef: 'v1',
+            requiredDars: [{ file: 'a.dar', sha256: 'abc' }],
+            adminProtoRelativeDir: '.',
+          },
+        })
+      ).toThrow(/Unsafe adminProtoRelativeDir/);
+      expect(existsSync(marker)).toBe(true);
+    } finally {
+      rmSync(rootDir, { recursive: true, force: true });
     }
   });
 });
