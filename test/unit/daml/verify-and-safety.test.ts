@@ -15,10 +15,12 @@ import {
   assertGitCommitRef,
   assertSafeRelativePath,
   DarIntegrityError,
+  getDefaultSpliceDarsConfigPath,
   hashDirectoryTree,
   loadSyncSpliceDarsConfig,
   requireBackedUpDar,
   resolveContainedPath,
+  resolveSyncSpliceDarsConfigPath,
   saveDarsLock,
   syncSpliceDars,
   verifyDars,
@@ -127,7 +129,9 @@ describe('path containment helpers', (): void => {
     );
     expect(() => assertSafeRelativePath('.', 'darsRelativeDir')).toThrow(/Unsafe/);
     expect(() => assertSafeRelativePath('..', 'adminProtoRelativeDir')).toThrow(/Unsafe/);
-    expect(() => assertSafeRelativePath('./main', 'multi-package.yaml packages entry')).not.toThrow();
+    expect(() =>
+      assertSafeRelativePath('./main', 'multi-package.yaml packages entry')
+    ).not.toThrow();
     expect(() => assertSafeRelativePath('ok/file.dar', 'requiredDars.file')).not.toThrow();
   });
 
@@ -158,6 +162,51 @@ describe('path containment helpers', (): void => {
 });
 
 describe('sync-splice-dars path safety', (): void => {
+  it('falls back to the packaged default when the consumer has no splice-dars.json', (): void => {
+    const rootDir = mkdtempSync(join(tmpdir(), 'canton-dev-tools-sync-default-'));
+    const previous = process.env['CANTON_SPLICE_DARS_CONFIG'];
+    try {
+      delete process.env['CANTON_SPLICE_DARS_CONFIG'];
+      const resolved = resolveSyncSpliceDarsConfigPath(rootDir);
+      expect(resolved).toBe(getDefaultSpliceDarsConfigPath());
+      expect(existsSync(resolved)).toBe(true);
+      const config = loadSyncSpliceDarsConfig(resolved);
+      expect(config.spliceRef).toMatch(/^[0-9a-f]{40}$/);
+      expect(config.requiredDars.length).toBeGreaterThan(0);
+    } finally {
+      if (previous === undefined) {
+        delete process.env['CANTON_SPLICE_DARS_CONFIG'];
+      } else {
+        process.env['CANTON_SPLICE_DARS_CONFIG'] = previous;
+      }
+      rmSync(rootDir, { recursive: true, force: true });
+    }
+  });
+
+  it('prefers consumer splice-dars.json over the packaged default', (): void => {
+    const rootDir = mkdtempSync(join(tmpdir(), 'canton-dev-tools-sync-override-'));
+    const previous = process.env['CANTON_SPLICE_DARS_CONFIG'];
+    try {
+      delete process.env['CANTON_SPLICE_DARS_CONFIG'];
+      const consumerConfig = join(rootDir, 'splice-dars.json');
+      writeFileSync(
+        consumerConfig,
+        JSON.stringify({
+          spliceRef: 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef',
+          requiredDars: [{ file: 'a.dar', sha256: 'abc' }],
+        })
+      );
+      expect(resolveSyncSpliceDarsConfigPath(rootDir)).toBe(consumerConfig);
+    } finally {
+      if (previous === undefined) {
+        delete process.env['CANTON_SPLICE_DARS_CONFIG'];
+      } else {
+        process.env['CANTON_SPLICE_DARS_CONFIG'] = previous;
+      }
+      rmSync(rootDir, { recursive: true, force: true });
+    }
+  });
+
   it('rejects unsafe directory fields in config JSON', (): void => {
     const rootDir = mkdtempSync(join(tmpdir(), 'canton-dev-tools-sync-cfg-'));
     try {

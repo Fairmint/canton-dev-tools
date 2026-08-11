@@ -1,8 +1,13 @@
 /**
  * Sync pinned Splice DARs (and optionally Canton admin protos) into a consumer repo.
  *
- * Requires a JSON config (default `splice-dars.json` in the repo root) so each consumer
- * owns SPLICE_REF + REQUIRED_DARS. Env overrides: SPLICE_REPO, SPLICE_REF, CANTON_SPLICE_DARS_CONFIG.
+ * Config resolution order:
+ * 1. `--config` / `options.configPath`
+ * 2. `CANTON_SPLICE_DARS_CONFIG`
+ * 3. consumer `splice-dars.json` (optional per-repo override)
+ * 4. packaged default at `config/default-splice-dars.json` (shared Fairmint pin)
+ *
+ * Env overrides: SPLICE_REPO, SPLICE_REF, CANTON_SPLICE_DARS_CONFIG.
  */
 
 import { execFileSync } from 'node:child_process';
@@ -60,19 +65,32 @@ const DEFAULT_DARS_RELATIVE_DIR = 'libs/splice/daml/dars';
 const DEFAULT_ADMIN_PROTO_RELATIVE_DIR = 'libs/splice/canton/community/admin-api/src/main/protobuf';
 const SYNC_STATE_FILENAME = '.canton-splice-sync-state.json';
 
-function resolveConfigPath(rootDir: string, configPath?: string): string {
+/** Packaged shared pin shipped with `@fairmint/canton-dev-tools`. */
+export function getDefaultSpliceDarsConfigPath(): string {
+  return path.join(__dirname, '..', '..', 'config', 'default-splice-dars.json');
+}
+
+/**
+ * Resolve which splice-dars config file to load.
+ * Consumer `splice-dars.json` overrides the packaged default when present.
+ */
+export function resolveSyncSpliceDarsConfigPath(rootDir: string, configPath?: string): string {
   if (configPath) return path.resolve(configPath);
   if (process.env['CANTON_SPLICE_DARS_CONFIG']) {
     return path.resolve(process.env['CANTON_SPLICE_DARS_CONFIG']);
   }
-  return path.join(rootDir, 'splice-dars.json');
+  const consumerConfig = path.join(rootDir, 'splice-dars.json');
+  if (fs.existsSync(consumerConfig)) {
+    return consumerConfig;
+  }
+  return getDefaultSpliceDarsConfigPath();
 }
 
 export function loadSyncSpliceDarsConfig(configPath: string): SyncSpliceDarsConfig {
   if (!fs.existsSync(configPath)) {
     throw new Error(
       `Splice DAR config not found: ${configPath}\n` +
-        'Create splice-dars.json (or pass --config) with spliceRef + requiredDars.\n' +
+        'Expected packaged config/default-splice-dars.json, or create splice-dars.json / pass --config.\n' +
         'See README for the expected shape.'
     );
   }
@@ -440,8 +458,7 @@ function syncSpliceDarsFiles(rootDir: string, config: SyncSpliceDarsConfig): voi
     DEFAULT_ADMIN_PROTO_RELATIVE_DIR,
     'adminProtoRelativeDir'
   );
-  const adminProtoSourceRelative =
-    config.adminProtoSourceDir || DEFAULT_ADMIN_PROTO_SOURCE_DIR;
+  const adminProtoSourceRelative = config.adminProtoSourceDir || DEFAULT_ADMIN_PROTO_SOURCE_DIR;
   const packageService = config.adminProtoPackageService || DEFAULT_ADMIN_PROTO_PACKAGE_SERVICE;
   const syncAdminProtos = config.syncAdminProtos !== false;
   if (syncAdminProtos) {
@@ -464,9 +481,7 @@ function syncSpliceDarsFiles(rootDir: string, config: SyncSpliceDarsConfig): voi
     console.log(`Fetching Splice DARs from ${spliceRepo} at ${spliceRef}`);
     runGit(['clone', '--filter=blob:none', '--sparse', '--no-checkout', spliceRepo, cloneDir]);
     runGit(['checkout', spliceRef], cloneDir);
-    const sparsePaths = syncAdminProtos
-      ? ['daml/dars', adminProtoSourceRelative]
-      : ['daml/dars'];
+    const sparsePaths = syncAdminProtos ? ['daml/dars', adminProtoSourceRelative] : ['daml/dars'];
     runGit(['sparse-checkout', 'set', ...sparsePaths], cloneDir);
 
     fs.mkdirSync(darsDir, { recursive: true });
@@ -537,7 +552,8 @@ export function syncSpliceDars(options: SyncSpliceDarsOptions): void {
   const rootDir = path.resolve(options.rootDir);
   const force = options.force ?? false;
   const config =
-    options.config ?? loadSyncSpliceDarsConfig(resolveConfigPath(rootDir, options.configPath));
+    options.config ??
+    loadSyncSpliceDarsConfig(resolveSyncSpliceDarsConfigPath(rootDir, options.configPath));
 
   for (const dar of config.requiredDars) {
     assertSafeRelativePath(dar.file, 'requiredDars.file');

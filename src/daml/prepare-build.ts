@@ -8,7 +8,11 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as yaml from 'yaml';
-import { assertSafeRelativePath, normalizeRelativePath, resolveContainedPath } from './sync-splice-dars';
+import {
+  assertSafeRelativePath,
+  normalizeRelativePath,
+  resolveContainedPath,
+} from './sync-splice-dars';
 
 export interface PrepareBuildOptions {
   rootDir: string;
@@ -148,7 +152,11 @@ export function prepareBuild(options: PrepareBuildOptions): string[] {
 
   const generatedPackages: string[] = [];
   for (const [sourceDir, packageName] of packageNames) {
-    const sourcePath = resolveContainedPath(rootDir, sourceDir, 'multi-package.yaml packages entry');
+    const sourcePath = resolveContainedPath(
+      rootDir,
+      sourceDir,
+      'multi-package.yaml packages entry'
+    );
     const targetPath = resolveContainedPath(buildRoot, packageName, 'daml.yaml name');
     assertPathInsideRoot(rootDir, targetPath, 'prepare-build target');
     copyDir(sourcePath, targetPath);

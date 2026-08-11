@@ -64,7 +64,7 @@ Environment:
   CANTON_LOCALNET_AUTH_MODE          oauth2 (package default) or shared-secret
   CANTON_LOCALNET_INFRA_ONLY         Defaults to true for this package binary
   SPLICE_REF / SPLICE_REPO           Overrides for sync-splice-dars
-  CANTON_SPLICE_DARS_CONFIG          Path to splice-dars.json
+  CANTON_SPLICE_DARS_CONFIG          Optional path override (else packaged default / splice-dars.json)
 USAGE
 }
 

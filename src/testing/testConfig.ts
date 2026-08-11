@@ -94,10 +94,7 @@ export function buildLocalnetClientConfig(): ClientConfig {
 /** @deprecated Prefer {@link buildLocalnetClientConfig}. */
 export const buildIntegrationTestClientConfig = buildLocalnetClientConfig;
 
-function buildAuthConfig(
-  apiType: string,
-  options: { preferOAuth?: boolean } = {}
-): AuthConfig {
+function buildAuthConfig(apiType: string, options: { preferOAuth?: boolean } = {}): AuthConfig {
   const apiPrefix = `FAIRMINT_TEST_${apiType}`;
   const authUrl = getEnv('FAIRMINT_TEST_AUTH_URL');
   const clientId =

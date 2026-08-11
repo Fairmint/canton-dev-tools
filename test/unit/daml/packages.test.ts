@@ -161,16 +161,10 @@ describe('daml package discovery + prepare-build', (): void => {
   });
 
   it('rejects multi-package source dirs and daml.yaml names that escape the build tree', (): void => {
-    writeFileSync(
-      join(rootDir, 'multi-package.yaml'),
-      `packages:\n  - ../../../.github\n`
-    );
+    writeFileSync(join(rootDir, 'multi-package.yaml'), `packages:\n  - ../../../.github\n`);
     expect(() => prepareBuild({ rootDir })).toThrow(/Unsafe/);
 
-    writeFileSync(
-      join(rootDir, 'multi-package.yaml'),
-      `packages:\n  - WrappedAssets-v01\n`
-    );
+    writeFileSync(join(rootDir, 'multi-package.yaml'), `packages:\n  - WrappedAssets-v01\n`);
     writeFileSync(
       join(rootDir, 'WrappedAssets-v01', 'daml.yaml'),
       `sdk-version: 3.5.2\nname: ../../../.github\nsource: daml\nversion: 0.0.1\ndependencies: []\n`
@@ -179,16 +173,10 @@ describe('daml package discovery + prepare-build', (): void => {
   });
 
   it('rejects escaping source dirs and daml.yaml names during package discovery', (): void => {
-    writeFileSync(
-      join(rootDir, 'multi-package.yaml'),
-      `packages:\n  - ../outside\n`
-    );
+    writeFileSync(join(rootDir, 'multi-package.yaml'), `packages:\n  - ../outside\n`);
     expect(() => discoverPackages(rootDir)).toThrow(/Unsafe/);
 
-    writeFileSync(
-      join(rootDir, 'multi-package.yaml'),
-      `packages:\n  - WrappedAssets-v01\n`
-    );
+    writeFileSync(join(rootDir, 'multi-package.yaml'), `packages:\n  - WrappedAssets-v01\n`);
     writeFileSync(
       join(rootDir, 'WrappedAssets-v01', 'daml.yaml'),
       `sdk-version: 3.5.2\nname: ../escape\nsource: daml\nversion: 0.0.1\ndependencies: []\n`

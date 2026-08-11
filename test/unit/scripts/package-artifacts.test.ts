@@ -35,6 +35,7 @@ describe('package artifact policy', (): void => {
 
     expect(pkg.files).toEqual([
       'bin/canton-dev-tools',
+      'config/default-splice-dars.json',
       'scripts/localnet-cloud.sh',
       'scripts/install-dpm-sdks.sh',
       'dist/**',

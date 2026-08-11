@@ -39,14 +39,19 @@ npx canton-dev-tools verify-dars
 npx canton-dev-tools backup-dar --package WrappedAssets-v01 --version 0.0.1
 npx canton-dev-tools check-dar-version-policy --all
 npx canton-dev-tools check-upgrade-compat
-npx canton-dev-tools sync-splice-dars --config splice-dars.json
+npx canton-dev-tools sync-splice-dars
 ```
 
 `backup-dar` / version-policy / upgrade-compat skip `Test` packages by default. Pass `--package` with the daml.yaml name, source dir, or a fuzzy alias (e.g. `wrappedAssets`).
 
 ### `sync-splice-dars` config
 
-Create `splice-dars.json` in the repo root (or pass `--config` / `CANTON_SPLICE_DARS_CONFIG`):
+By default, sync uses the packaged pin at `config/default-splice-dars.json` (Splice **0.7.0**
+token-standard + amulet DARs). Optional overrides, in order:
+
+1. `--config <path>`
+2. `CANTON_SPLICE_DARS_CONFIG`
+3. repo-root `splice-dars.json` (per-repo pin when it must differ from the shared default)
 
 ```json
 {
