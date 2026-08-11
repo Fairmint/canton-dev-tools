@@ -166,8 +166,9 @@ export function assertSafeRelativePath(relativePath: string, label: string): voi
     throw new Error(`Unsafe ${label}: ${relativePath}`);
   }
   const normalized = relativePath.replace(/\\/g, '/');
-  const parts = normalized.split('/');
-  if (parts.some((part) => part === '..' || part === '' || part === '.')) {
+  // Allow `./pkg` by dropping `.` segments; still reject `..`, empties, and `.` alone.
+  const parts = normalized.split('/').filter((part) => part !== '.');
+  if (parts.length === 0 || parts.some((part) => part === '..' || part === '')) {
     throw new Error(`Unsafe ${label}: ${relativePath}`);
   }
 }
@@ -219,6 +220,26 @@ function resolveSyncRelativeDir(
     throw new Error(`Unsafe ${label}: ${relative}`);
   }
   return resolved;
+}
+
+function assertDirectoriesDoNotOverlap(
+  left: string,
+  right: string,
+  leftLabel: string,
+  rightLabel: string
+): void {
+  const leftResolved = path.resolve(left);
+  const rightResolved = path.resolve(right);
+  if (
+    leftResolved === rightResolved ||
+    leftResolved.startsWith(`${rightResolved}${path.sep}`) ||
+    rightResolved.startsWith(`${leftResolved}${path.sep}`)
+  ) {
+    throw new Error(
+      `${leftLabel} and ${rightLabel} must not overlap ` +
+        `(${leftLabel}=${leftResolved}, ${rightLabel}=${rightResolved})`
+    );
+  }
 }
 
 function effectiveSpliceRef(config: SyncSpliceDarsConfig): string {
@@ -336,6 +357,14 @@ function checkExistingFiles(
   );
   const packageService = config.adminProtoPackageService || DEFAULT_ADMIN_PROTO_PACKAGE_SERVICE;
   const syncAdminProtos = config.syncAdminProtos !== false;
+  if (syncAdminProtos) {
+    assertDirectoriesDoNotOverlap(
+      darsDir,
+      adminProtoDir,
+      'darsRelativeDir',
+      'adminProtoRelativeDir'
+    );
+  }
 
   let needsSync = false;
   const errors: string[] = [];
@@ -406,6 +435,14 @@ function syncSpliceDarsFiles(rootDir: string, config: SyncSpliceDarsConfig): voi
     config.adminProtoSourceDir || DEFAULT_ADMIN_PROTO_SOURCE_DIR;
   const packageService = config.adminProtoPackageService || DEFAULT_ADMIN_PROTO_PACKAGE_SERVICE;
   const syncAdminProtos = config.syncAdminProtos !== false;
+  if (syncAdminProtos) {
+    assertDirectoriesDoNotOverlap(
+      darsDir,
+      adminProtoDir,
+      'darsRelativeDir',
+      'adminProtoRelativeDir'
+    );
+  }
 
   // Validate source/package paths before any clone or filesystem mutation.
   assertSafeRelativePath(adminProtoSourceRelative, 'adminProtoSourceDir');

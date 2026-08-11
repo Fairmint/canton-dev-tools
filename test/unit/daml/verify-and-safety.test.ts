@@ -127,6 +127,7 @@ describe('path containment helpers', (): void => {
     );
     expect(() => assertSafeRelativePath('.', 'darsRelativeDir')).toThrow(/Unsafe/);
     expect(() => assertSafeRelativePath('..', 'adminProtoRelativeDir')).toThrow(/Unsafe/);
+    expect(() => assertSafeRelativePath('./main', 'multi-package.yaml packages entry')).not.toThrow();
     expect(() => assertSafeRelativePath('ok/file.dar', 'requiredDars.file')).not.toThrow();
   });
 
