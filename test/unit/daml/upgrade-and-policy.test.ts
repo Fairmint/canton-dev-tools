@@ -184,4 +184,14 @@ describe('checkDarVersionPolicy --package', (): void => {
       checkDarVersionPolicy({ rootDir, base: 'HEAD', packageKey: 'does-not-exist' })
     ).toThrow(/Unknown package/);
   });
+
+  it('rejects daml.yaml versions that are not strict semver before building lock paths', (): void => {
+    writeFileSync(
+      join(rootDir, 'WrappedAssets-v01', 'daml.yaml'),
+      `sdk-version: 3.5.2\nname: WrappedAssets-v01\nsource: daml\nversion: ../escape\ndependencies: []\n`
+    );
+    expect(() =>
+      checkDarVersionPolicy({ rootDir, base: 'HEAD', packageKey: 'WrappedAssets-v01' })
+    ).toThrow(/Invalid daml.yaml version/);
+  });
 });

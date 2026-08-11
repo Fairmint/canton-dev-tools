@@ -33,6 +33,7 @@ import {
   type DeploymentNetwork,
 } from './dar-version-policy';
 import { discoverManagedPackages, requirePackage, type PackageConfig } from './packages';
+import { resolveContainedPath } from './sync-splice-dars';
 
 export interface CheckDarVersionPolicyOptions {
   rootDir: string;
@@ -112,7 +113,7 @@ function lockEntriesForPackage(lock: DarsLock, packageName: string) {
 }
 
 function verifyEntry(rootDir: string, key: string, entry: DarsLockEntry): void {
-  const darPath = path.join(getDarsDir(rootDir), key);
+  const darPath = resolveContainedPath(getDarsDir(rootDir), key, 'dars.lock key');
   if (!fs.existsSync(darPath)) throw new Error(`Missing DAR recorded in dars.lock: ${key}`);
   const stats = fs.statSync(darPath);
   if (!stats.isFile()) throw new Error(`DAR path is not a file: ${key}`);
@@ -176,6 +177,9 @@ function freshAndLockedEntry(
   pkg: PackageConfig,
   lock: DarsLock
 ): { key: string; entry: DarsLockEntry; hash: string } {
+  if (!parseStrictSemver(pkg.version)) {
+    throw new Error(`Invalid daml.yaml version for ${pkg.name}: ${pkg.version}`);
+  }
   const key = getDarLockKey(pkg.name, pkg.version, pkg.darName);
   const entry = getLockEntry(lock, key);
   if (!entry) throw new Error(`Current package is not backed up: ${key}`);
@@ -475,6 +479,11 @@ export function checkDarVersionPolicy(options: CheckDarVersionPolicyOptions): vo
     packages = allPackages;
   } else {
     packages = changedPackages(rootDir, base, currentLock, baseLock, allPackages);
+  }
+  for (const pkg of packages) {
+    if (!parseStrictSemver(pkg.version)) {
+      throw new Error(`Invalid daml.yaml version for ${pkg.name}: ${pkg.version}`);
+    }
   }
   const tagNames = deploymentTagNames(rootDir);
   const latestTaggedEntries = new Map<string, DarsLockEntry>();
