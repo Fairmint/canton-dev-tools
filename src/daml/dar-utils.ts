@@ -167,13 +167,7 @@ export function getDarLockKey(packageName: string, version: string, darName: str
     ['version', version],
     ['darName', darName],
   ] as const) {
-    if (
-      !value ||
-      value.includes('/') ||
-      value.includes('\\') ||
-      value === '.' ||
-      value === '..'
-    ) {
+    if (!value || value.includes('/') || value.includes('\\') || value === '.' || value === '..') {
       throw new Error(`Unsafe ${label} for DAR lock key: ${value}`);
     }
   }

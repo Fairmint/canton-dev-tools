@@ -23,7 +23,7 @@ DAML package commands (run from a multi-package repo root):
   backup-dar                 Backup a built DAR into dars/
   check-dar-version-policy   Enforce DAR version / deployment tag policy
   check-upgrade-compat       Run dpm upgrade-check against backups
-  sync-splice-dars           Fetch pinned Splice DARs from splice-dars.json
+  sync-splice-dars           Fetch pinned Splice DARs (packaged default or splice-dars.json)
   install-dpm-sdks           Install Daml SDKs from daml.yaml (shell helper)
 
 Common options:

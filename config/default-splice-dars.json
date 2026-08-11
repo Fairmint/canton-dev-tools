@@ -1,0 +1,70 @@
+{
+  "spliceRef": "398919a5b13479877fd61587003ba7a4ba00091b",
+  "requiredDars": [
+    {
+      "file": "splice-amulet-0.1.16.dar",
+      "sha256": "d799e1750bce6099daa996049a318e78f8b424e4e091268012fc3dc111b7a4cb"
+    },
+    {
+      "file": "splice-amulet-0.1.19.dar",
+      "sha256": "003554a4f3e6a6ee56f5edd55f0be3d521c4b075fc0c3efdc45e114561ad390d"
+    },
+    {
+      "file": "splice-api-featured-app-v1-1.0.0.dar",
+      "sha256": "01df2e1b86e3a1b9ab55e97e42f280563c9d1fbe909963c74bef62dd642aa3ee"
+    },
+    {
+      "file": "splice-api-token-allocation-instruction-v1-1.0.0.dar",
+      "sha256": "e2607ca3a1d735a82d3066b78132aa8f94b1886c99a5f14148742d252c7220a2"
+    },
+    {
+      "file": "splice-api-token-allocation-instruction-v2-1.0.0.dar",
+      "sha256": "31de6be30385936105b24c8ea544bb25f6eede0d0c008154a11462bb6d14a17b"
+    },
+    {
+      "file": "splice-api-token-allocation-request-v2-1.0.0.dar",
+      "sha256": "aea00bf92c841807c7b02a82eaf2a1599ec8a0f11b2de05edd31fc140a2426b9"
+    },
+    {
+      "file": "splice-api-token-allocation-v1-1.0.0.dar",
+      "sha256": "c3f3b447142577ea4fa7d912ca11cd6821de7588e324e8877425932a02fccaa1"
+    },
+    {
+      "file": "splice-api-token-allocation-v2-1.0.0.dar",
+      "sha256": "e349d3a1952cdd52ed55333bef35e9ba40e6e0379521d65556c6aa2f50d9a1fd"
+    },
+    {
+      "file": "splice-api-token-burn-mint-v1-1.0.0.dar",
+      "sha256": "a18e85c4841a278bce000df8329c3f0e2fee3b30b55dd6a31492d10a72b4f9c1"
+    },
+    {
+      "file": "splice-api-token-holding-v1-1.0.0.dar",
+      "sha256": "ef75f8eb41a65810221784fdb78bb9dfac7cb22245aba14fa7cb7f69c34e0175"
+    },
+    {
+      "file": "splice-api-token-holding-v2-1.0.0.dar",
+      "sha256": "f044b34d7a28c2b6c8a540af720297d55450a889b451dc4eed64a9914f1d6b00"
+    },
+    {
+      "file": "splice-api-token-metadata-v1-1.0.0.dar",
+      "sha256": "455eb160cb5abd4ae9918a6fbb9dad471f721adda39f0e5c76feef08d05637fc"
+    },
+    {
+      "file": "splice-api-token-transfer-events-v2-1.0.0.dar",
+      "sha256": "9a1ebe5aece0a7f1a49069fd7aba0ced92c4ae94e5e3d49cdb097733a87dddbc"
+    },
+    {
+      "file": "splice-api-token-transfer-instruction-v1-1.0.0.dar",
+      "sha256": "e4c73aa7ae73fb2fc330b938ffb99f568792321640ba4b9472902aa8d742c994"
+    },
+    {
+      "file": "splice-api-token-transfer-instruction-v2-1.0.0.dar",
+      "sha256": "720e766456b33abdd26bfc21e54d19413559f0a7ee52000e12d3b6c308199faa"
+    },
+    {
+      "file": "splice-token-standard-utils-2.0.0.dar",
+      "sha256": "60cd68514b48efacea343722c3692436f300d2e33f98d9e5bc0673347961aca0"
+    }
+  ],
+  "syncAdminProtos": true
+}

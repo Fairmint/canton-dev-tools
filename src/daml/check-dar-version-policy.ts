@@ -90,9 +90,13 @@ function loadLockAtRef(rootDir: string, ref: string): DarsLock {
     return { version: 1, packages: {} };
   }
 
-  const parsed = parseDarsLockContent(gitText(rootDir, ['show', `${ref}:dars/dars.lock`]), `${ref}:dars/dars.lock`, {
-    requireVersion1: true,
-  });
+  const parsed = parseDarsLockContent(
+    gitText(rootDir, ['show', `${ref}:dars/dars.lock`]),
+    `${ref}:dars/dars.lock`,
+    {
+      requireVersion1: true,
+    }
+  );
   return parsed;
 }
 

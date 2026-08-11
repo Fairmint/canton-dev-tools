@@ -1,6 +1,6 @@
 {
   "name": "@fairmint/canton-dev-tools",
-  "version": "0.1.0",
+  "version": "0.1.4",
   "description": "Shared LocalNet CLI, DAML package tooling, and Canton integration-test helpers for Fairmint",
   "keywords": [
     "canton",
@@ -46,6 +46,7 @@
   },
   "files": [
     "bin/canton-dev-tools",
+    "config/default-splice-dars.json",
     "scripts/localnet-cloud.sh",
     "scripts/install-dpm-sdks.sh",
     "dist/**"

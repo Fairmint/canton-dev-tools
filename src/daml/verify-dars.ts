@@ -194,7 +194,9 @@ export function runVerifyDarsCli(options: VerifyDarsOptions): void {
       );
       console.error('  2. If changes were accidental, restore the original DAR files');
       console.error('  3. Never modify backed-up DAR files directly');
-      console.error('  4. Run with --update to fix dars.lock hash/size/untracked (use with caution)\n');
+      console.error(
+        '  4. Run with --update to fix dars.lock hash/size/untracked (use with caution)\n'
+      );
     } else if (result.missing > 0) {
       console.error(
         'Tracked DAR files are missing from disk. Restore them before re-running --update.\n'

@@ -3,11 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import {
-  checkDarVersionPolicy,
-  checkUpgradeCompatibility,
-  saveDarsLock,
-} from '../../../src/daml';
+import { checkDarVersionPolicy, checkUpgradeCompatibility, saveDarsLock } from '../../../src/daml';
 
 function sha256(content: string | Buffer): string {
   return createHash('sha256').update(content).digest('hex');
@@ -99,14 +95,7 @@ describe('checkUpgradeCompatibility', (): void => {
 
   it('rejects non-semver versions in dars.lock when selecting upgrade baselines', (): void => {
     const currentBytes = Buffer.from('current-dar');
-    const distDir = join(
-      rootDir,
-      'generated',
-      'build',
-      'WrappedAssets-v01',
-      '.daml',
-      'dist'
-    );
+    const distDir = join(rootDir, 'generated', 'build', 'WrappedAssets-v01', '.daml', 'dist');
     mkdirSync(distDir, { recursive: true });
     writeFileSync(join(distDir, 'WrappedAssets-v01-0.0.2.dar'), currentBytes);
     mkdirSync(join(rootDir, 'dars', 'WrappedAssets-v01', '0.0.2'), { recursive: true });
@@ -134,21 +123,12 @@ describe('checkUpgradeCompatibility', (): void => {
       },
     });
 
-    expect(() => checkUpgradeCompatibility({ rootDir })).toThrow(
-      /Invalid semver in dars.lock key/
-    );
+    expect(() => checkUpgradeCompatibility({ rootDir })).toThrow(/Invalid semver in dars.lock key/);
   });
 
   it('fails when an older lock baseline is missing on disk instead of treating as first release', (): void => {
     const currentBytes = Buffer.from('current-dar');
-    const distDir = join(
-      rootDir,
-      'generated',
-      'build',
-      'WrappedAssets-v01',
-      '.daml',
-      'dist'
-    );
+    const distDir = join(rootDir, 'generated', 'build', 'WrappedAssets-v01', '.daml', 'dist');
     mkdirSync(distDir, { recursive: true });
     writeFileSync(join(distDir, 'WrappedAssets-v01-0.0.2.dar'), currentBytes);
 
@@ -199,14 +179,7 @@ describe('checkUpgradeCompatibility', (): void => {
   it('fails when the committed current backup exists but does not match dars.lock', (): void => {
     const buildBytes = Buffer.from('build-dar');
     const corruptBackup = Buffer.from('corrupt-backup-bytes');
-    const distDir = join(
-      rootDir,
-      'generated',
-      'build',
-      'WrappedAssets-v01',
-      '.daml',
-      'dist'
-    );
+    const distDir = join(rootDir, 'generated', 'build', 'WrappedAssets-v01', '.daml', 'dist');
     mkdirSync(distDir, { recursive: true });
     writeFileSync(join(distDir, 'WrappedAssets-v01-0.0.2.dar'), buildBytes);
     mkdirSync(join(rootDir, 'dars', 'WrappedAssets-v01', '0.0.2'), { recursive: true });
