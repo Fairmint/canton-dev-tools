@@ -11,6 +11,7 @@ import * as path from 'node:path';
 import { computeSha256, getDarLockKey, getDarsDir, loadDarsLock } from './dar-utils';
 import { compareSemver, parseStrictSemver } from './dar-version-policy';
 import { discoverManagedPackages, type PackageConfig } from './packages';
+import { resolveContainedPath } from './sync-splice-dars';
 
 export interface CheckUpgradeCompatibilityOptions {
   rootDir: string;
@@ -55,7 +56,7 @@ function getBackedUpPackages(rootDir: string): Map<string, BackupRecord[]> {
     // Keep lock entries even when the DAR is missing on disk. Dropping them would
     // hide broken baselines and treat the package as a first release (skipping
     // upgrade-check). Missing files fail later via verifyBackupAgainstLock.
-    const darPath = path.join(darsDir, lockKey);
+    const darPath = resolveContainedPath(darsDir, lockKey, 'dars.lock key');
 
     if (!byPackageName.has(packageName)) {
       byPackageName.set(packageName, []);
@@ -201,7 +202,7 @@ export function checkUpgradeCompatibility(options: CheckUpgradeCompatibilityOpti
       currentDar.version,
       currentPackageName
     );
-    const committedBackupPath = path.join(darsDir, currentLockKey);
+    const committedBackupPath = resolveContainedPath(darsDir, currentLockKey, 'dars.lock key');
     if (!(currentLockKey in lock.packages)) {
       console.error(`❌ ${currentPackageName}: No dars.lock entry for the current release.\n`);
       console.error(`   Expected key: ${currentLockKey}`);

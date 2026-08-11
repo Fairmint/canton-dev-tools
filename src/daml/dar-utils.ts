@@ -4,6 +4,7 @@ import { execFileSync } from 'node:child_process';
 import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { resolveContainedPath } from './sync-splice-dars';
 
 export interface DarsLockEntry {
   sha256: string;
@@ -47,7 +48,16 @@ export class DarIntegrityError extends Error {
 
 /** Get the path to the dars directory. */
 export function getDarsDir(rootDir: string): string {
-  return path.join(rootDir, 'dars');
+  const root = path.resolve(rootDir);
+  const darsDir = path.join(root, 'dars');
+  if (fs.existsSync(darsDir)) {
+    const realRoot = fs.realpathSync(root);
+    const realDars = fs.realpathSync(darsDir);
+    if (realDars !== realRoot && !realDars.startsWith(`${realRoot}${path.sep}`)) {
+      throw new Error(`Unsafe dars directory escapes repo root: ${darsDir}`);
+    }
+  }
+  return darsDir;
 }
 
 /** Parse and validate a dars.lock JSON document. */
@@ -152,8 +162,22 @@ export function computeSha256(filePath: string): string {
 
 /** Get the lock key for a DAR file. Always uses forward slashes for consistency across platforms. */
 export function getDarLockKey(packageName: string, version: string, darName: string): string {
-  const key = path.join(packageName, version, `${darName}.dar`);
-  return key.replace(/\\/g, '/');
+  for (const [label, value] of [
+    ['packageName', packageName],
+    ['version', version],
+    ['darName', darName],
+  ] as const) {
+    if (
+      !value ||
+      value.includes('/') ||
+      value.includes('\\') ||
+      value === '.' ||
+      value === '..'
+    ) {
+      throw new Error(`Unsafe ${label} for DAR lock key: ${value}`);
+    }
+  }
+  return `${packageName}/${version}/${darName}.dar`;
 }
 
 /** Find all DAR files in a directory recursively. */
@@ -166,9 +190,12 @@ export function findDarFiles(darsDir: string): string[] {
     const entries = fs.readdirSync(dir, { withFileTypes: true });
     for (const entry of entries) {
       const fullPath = path.join(dir, entry.name);
+      if (entry.isSymbolicLink()) {
+        throw new Error(`Refusing to treat symlink as DAR path: ${fullPath}`);
+      }
       if (entry.isDirectory()) {
         scanDir(fullPath);
-      } else if (entry.name.endsWith('.dar')) {
+      } else if (entry.isFile() && entry.name.endsWith('.dar')) {
         files.push(fullPath);
       }
     }
@@ -195,7 +222,7 @@ export function getBackedUpDarPath(
     return null;
   }
 
-  const darPath = path.join(getDarsDir(rootDir), lockKey);
+  const darPath = resolveContainedPath(getDarsDir(rootDir), lockKey, 'dars.lock key');
   if (!fs.existsSync(darPath)) {
     console.warn(`⚠️ DAR recorded in dars.lock but file missing: ${lockKey}`);
     return null;

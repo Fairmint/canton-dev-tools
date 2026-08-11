@@ -288,6 +288,6 @@ describe('checkDarVersionPolicy --package', (): void => {
     );
     expect(() =>
       checkDarVersionPolicy({ rootDir, base: 'HEAD', packageKey: 'WrappedAssets-v01' })
-    ).toThrow(/Invalid daml.yaml version/);
+    ).toThrow(/invalid version/);
   });
 });

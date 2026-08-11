@@ -8,6 +8,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as yaml from 'yaml';
+import { parseStrictSemver } from './dar-version-policy';
 import { assertSafeRelativePath, resolveContainedPath } from './sync-splice-dars';
 import { isContractNetwork, type ContractNetwork } from './types';
 
@@ -88,6 +89,9 @@ export function discoverPackages(
       throw new Error(`${damlYamlPath} is missing required name/version fields`);
     }
     assertSafeRelativePath(metadata.name, 'daml.yaml name');
+    if (!parseStrictSemver(metadata.version)) {
+      throw new Error(`${damlYamlPath} has invalid version: ${metadata.version}`);
+    }
     // Ensure derived buildDir stays under buildRoot (name already path-safe).
     resolveContainedPath(resolvedBuildRoot, metadata.name, 'daml.yaml name');
 
