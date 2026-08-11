@@ -468,9 +468,14 @@ export function checkDarVersionPolicy(options: CheckDarVersionPolicyOptions): vo
   const base = options.base ?? 'origin/main';
   const currentLock = loadDarsLock(rootDir);
   const baseLock = loadLockAtRef(rootDir, base);
-  const packages = options.all
-    ? allPackages
-    : changedPackages(rootDir, base, currentLock, baseLock, allPackages);
+  let packages: PackageConfig[];
+  if (options.packageKey) {
+    packages = [requirePackage(allPackages, options.packageKey)];
+  } else if (options.all) {
+    packages = allPackages;
+  } else {
+    packages = changedPackages(rootDir, base, currentLock, baseLock, allPackages);
+  }
   const tagNames = deploymentTagNames(rootDir);
   const latestTaggedEntries = new Map<string, DarsLockEntry>();
   for (const pkg of allPackages) {

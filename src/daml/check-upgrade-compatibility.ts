@@ -59,8 +59,10 @@ function getBackedUpPackages(rootDir: string): Map<string, BackupRecord[]> {
 
     const [packageName, version] = parts;
     if (!packageName || !version) continue;
+    // Keep lock entries even when the DAR is missing on disk. Dropping them would
+    // hide broken baselines and treat the package as a first release (skipping
+    // upgrade-check). Missing files fail later via verifyBackupAgainstLock.
     const darPath = path.join(darsDir, lockKey);
-    if (!fs.existsSync(darPath)) continue;
 
     if (!byPackageName.has(packageName)) {
       byPackageName.set(packageName, []);
@@ -301,6 +303,13 @@ export function checkUpgradeCompatibility(options: CheckUpgradeCompatibilityOpti
   if (hasFailures) {
     throw new Error(
       'Upgrade compatibility check failed! Fix the issues above or bump the major version for breaking changes.'
+    );
+  }
+
+  if (currentPackages.length > 0 && checkedCount === 0) {
+    throw new Error(
+      'Upgrade compatibility check found no built DARs to validate. ' +
+        'Build packages first (prepare-build + dpm build), then re-run check-upgrade-compat.'
     );
   }
 
