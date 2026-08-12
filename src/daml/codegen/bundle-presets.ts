@@ -122,7 +122,13 @@ export interface BundlePresetDefinition {
    * Special cases (featured-app-v2, always-on da-internal-template) override.
    */
   shouldApply?: (ctx: BundleApplyContext, detected: boolean) => boolean;
-  apply: (ctx: BundleApplyContext) => void;
+  /**
+   * Materialize bundled sources into the target package.
+   * Return `true` only when the preset tree is ready for import rewrite /
+   * package.json cleanup. Return `false` when required generated sources are
+   * missing so callers leave original imports and dependencies intact.
+   */
+  apply: (ctx: BundleApplyContext) => boolean;
   rewriteRules: (targetDir: string, pins: BundlePins) => GeneratedImportRewriteRule[];
 }
 
@@ -269,6 +275,7 @@ export declare const DA: { Internal: { Template: typeof Template } };
 `
       );
       console.log('✅ Created bundled DA.Internal.Template structure');
+      return true;
     },
     rewriteRules: (targetDir) => [
       {
@@ -342,6 +349,7 @@ export declare const Splice: { Api: { FeaturedAppRightV1: typeof FeaturedAppRigh
 `
       );
       console.log('✅ Created bundled splice-api-featured-app-v1 structure');
+      return true;
     },
     rewriteRules: (targetDir) => [
       {
@@ -368,7 +376,7 @@ export declare const Splice: { Api: { FeaturedAppRightV1: typeof FeaturedAppRigh
       );
       if (!fs.existsSync(sourceDir)) {
         console.log('⚠️  splice-api-featured-app-v2 FeaturedAppRightV2 directory not found');
-        return;
+        return false;
       }
       createDirectoryIfNotExists(path.join(ctx.targetDir, 'lib/Splice/Api'));
       copyDirectory(sourceDir, path.join(ctx.targetDir, 'lib/Splice/Api/FeaturedAppRightV2'));
@@ -385,6 +393,7 @@ export declare const Splice: { Api: { FeaturedAppRightV2: typeof FeaturedAppRigh
 `
       );
       console.log('✅ Copied splice-api-featured-app-v2 FeaturedAppRightV2 modules');
+      return true;
     },
     rewriteRules: (targetDir) => [
       {
@@ -412,9 +421,10 @@ export declare const Splice: { Api: { FeaturedAppRightV2: typeof FeaturedAppRigh
           'splice-amulet Splice directory'
         )
       ) {
-        return;
+        return false;
       }
       console.log('✅ Copied splice-amulet Splice modules');
+      return true;
     },
     rewriteRules: (targetDir, pins) => [
       {
@@ -439,7 +449,7 @@ export declare const Splice: { Api: { FeaturedAppRightV2: typeof FeaturedAppRigh
         'lib/DA/Time'
       );
       if (!copyModuleTreeOrWarn(sourceDir, path.join(ctx.targetDir, 'lib/DA/Time'), 'DA Time Types')) {
-        return;
+        return false;
       }
       ensureWrapper(
         ctx.targetDir,
@@ -454,6 +464,7 @@ export declare const DA: { Time: { Types: typeof Types } };
 `
       );
       console.log('✅ Copied DA Time Types modules');
+      return true;
     },
     rewriteRules: (targetDir) => [
       {
@@ -478,7 +489,7 @@ export declare const DA: { Time: { Types: typeof Types } };
         'lib/DA/Types'
       );
       if (!copyModuleTreeOrWarn(sourceDir, path.join(ctx.targetDir, 'lib/DA/Types'), 'DA Types')) {
-        return;
+        return false;
       }
       ensureWrapper(
         ctx.targetDir,
@@ -493,6 +504,7 @@ export declare const DA: { Types: typeof Types };
 `
       );
       console.log('✅ Copied DA Types modules');
+      return true;
     },
     rewriteRules: (targetDir) => [
       {
@@ -517,7 +529,7 @@ export declare const DA: { Types: typeof Types };
         'lib/DA/Set'
       );
       if (!copyModuleTreeOrWarn(sourceDir, path.join(ctx.targetDir, 'lib/DA/Set'), 'DA Set Types')) {
-        return;
+        return false;
       }
       ensureWrapper(
         ctx.targetDir,
@@ -532,6 +544,7 @@ export declare const DA: { Set: { Types: typeof Types } };
 `
       );
       console.log('✅ Copied DA Set Types modules');
+      return true;
     },
     rewriteRules: (targetDir) => [
       {
@@ -559,13 +572,20 @@ export declare const DA: { Set: { Types: typeof Types } };
     ],
     apply: (ctx) => {
       console.log('📦 Bundling Splice API Token dependencies...');
+      let copiedCount = 0;
       for (const pkg of TOKEN_V1_PACKAGES) {
         const sourceDir = path.join(packageDir(ctx.generatedJsDir, pkg.dirName), pkg.relModule);
         const destDir = path.join(ctx.targetDir, pkg.relModule);
         if (fs.existsSync(sourceDir)) {
           copyDirectory(sourceDir, destDir);
           console.log(`✅ Copied ${pkg.wrapperName}`);
+          copiedCount += 1;
         }
+      }
+
+      if (copiedCount === 0) {
+        console.log('⚠️  No splice-api-token-v1 source packages found');
+        return false;
       }
 
       for (const pkg of TOKEN_V1_PACKAGES) {
@@ -585,6 +605,7 @@ export declare const Splice: { Api: { Token: { ${pkg.wrapperKey}: typeof mod } }
 `
         );
       }
+      return true;
     },
     rewriteRules: (targetDir) =>
       TOKEN_V1_PACKAGES.map((pkg) => ({
@@ -609,7 +630,7 @@ export declare const Splice: { Api: { Token: { ${pkg.wrapperKey}: typeof mod } }
       } else {
         const alt = path.join(depRoot, 'lib/Splice');
         if (!copyModuleTreeOrWarn(alt, path.join(ctx.targetDir, 'lib/Splice'), 'splice-token-standard-utils')) {
-          return;
+          return false;
         }
       }
       ensureWrapper(
@@ -625,6 +646,7 @@ export declare const Splice: { TokenStandard: typeof TokenStandard };
 `
       );
       console.log('✅ Copied splice-token-standard-utils modules');
+      return true;
     },
     rewriteRules: (targetDir, pins) => [
       {

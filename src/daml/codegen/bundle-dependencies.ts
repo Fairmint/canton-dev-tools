@@ -270,12 +270,20 @@ export function bundleDependenciesForTarget(options: {
       continue;
     }
 
-    preset.apply({
+    const materialized = preset.apply({
       targetDir,
       generatedJsDir: options.generatedJsDir,
       pins: options.pins,
       willBundleAmulet,
     });
+    // Skip rewrite + dep removal when apply could not materialize sources —
+    // otherwise imports would point at missing __bundled__ paths.
+    if (!materialized) {
+      console.log(
+        `⚠️  Skipping rewrite/cleanup for preset ${preset.id}: generated dependency tree missing`
+      );
+      continue;
+    }
     applied.push(preset.id);
     rewriteRules.push(...preset.rewriteRules(targetDir, options.pins));
     packageJsonDeps.push(...preset.importSpecs(options.pins));

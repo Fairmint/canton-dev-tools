@@ -316,6 +316,47 @@ require('daml.js/splice-api-featured-app-v2-1.0.0');
       rmSync(root, { recursive: true, force: true });
     }
   });
+
+  it('does not rewrite or strip deps when preset source is missing', (): void => {
+    const root = scaffoldRepo();
+    try {
+      // Intentionally omit daml-stdlib-DA-Time-Types generated tree.
+      scaffoldDependencyTemplates(root);
+      rmSync(join(root, 'generated', 'js', 'daml-stdlib-DA-Time-Types-1.0.0'), {
+        recursive: true,
+        force: true,
+      });
+      const pkgDir = scaffoldGeneratedPackage(root);
+
+      const applied = bundleDependenciesForTarget({
+        targetDir: pkgDir,
+        generatedJsDir: join(root, 'generated', 'js'),
+        pins: { amulet: '0.1.19', tokenStandardUtils: '2.0.0' },
+        presets: ['da-internal-template', 'da-time-types'],
+        forcePresets: ['da-time-types'],
+      });
+
+      expect(applied).toEqual(['da-internal-template']);
+      expect(applied).not.toContain('da-time-types');
+      expect(existsSync(join(pkgDir, 'lib/__bundled__/daml-stdlib-DA-Time-Types'))).toBe(false);
+
+      const demoJs = readFileSync(join(pkgDir, 'lib/Demo/module.js'), 'utf8');
+      expect(demoJs).toContain("require('daml.js/daml-stdlib-DA-Time-Types-1.0.0')");
+      expect(demoJs).not.toContain('__bundled__/daml-stdlib-DA-Time-Types');
+      // Successful preset still rewrites.
+      expect(demoJs).toContain('__bundled__/ghc-stdlib-DA-Internal-Template');
+
+      const pkgJson = JSON.parse(readFileSync(join(pkgDir, 'package.json'), 'utf8')) as {
+        dependencies?: Record<string, string>;
+      };
+      expect(pkgJson.dependencies?.['daml.js/daml-stdlib-DA-Time-Types-1.0.0']).toBe(
+        'file:../daml-stdlib-DA-Time-Types-1.0.0'
+      );
+      expect(pkgJson.dependencies?.['daml.js/ghc-stdlib-DA-Internal-Template-1.0.0']).toBeUndefined();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('createRootIndex', (): void => {
