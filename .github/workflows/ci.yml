@@ -29,8 +29,18 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Lint
-        run: npm run lint
+      - name: Lint and format
+        run: npm run fix
+
+      - name: Fail if lint/format produced changes
+        run: |
+          if ! git diff --exit-code --quiet || ! git diff --cached --exit-code --quiet; then
+            echo "::error::Lint/format produced uncommitted changes. Run \`npm run fix\` locally and commit."
+            echo "=== DIFF ==="
+            git diff
+            echo "=== END DIFF ==="
+            exit 1
+          fi
 
       - name: Typecheck
         run: npm run typecheck

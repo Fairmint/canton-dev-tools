@@ -70,6 +70,7 @@
     "localnet:cip56-transfer": "CANTON_CIP56_REQUIRE_LOCALNET=1 tsx scripts/run-cip56-transfer-smoke.ts",
     "pack:check": "npm run check:package-artifacts",
     "prepack": "npm run clean && npm run build",
+    "prepare": "tsc -p tsconfig.json",
     "prepare-release": "tsx scripts/prepare-release.ts",
     "prepublishOnly": "npm run prepack",
     "test": "npm run -s typecheck && jest",

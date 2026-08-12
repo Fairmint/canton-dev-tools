@@ -190,6 +190,9 @@ describe('canton-dev-tools DAML command dispatch', (): void => {
     expect(help).toContain('prepare-build');
     expect(help).toContain('sync-splice-dars');
     expect(help).toContain('install-dpm-sdks');
+    expect(help).toContain('codegen-js');
+    expect(help).toContain('prepare-release');
+    expect(help).toContain('collapse-manifest');
   });
 
   it('dispatches prepare-build to dist/cli.js', (): void => {
@@ -216,6 +219,20 @@ describe('canton-dev-tools DAML command dispatch', (): void => {
         encoding: 'utf8',
       });
       expect(output).toBe('prepare-build --root /tmp');
+
+      const codegen = execFileSync(localnetBin, ['codegen-js', '--root', '/tmp'], {
+        encoding: 'utf8',
+      });
+      expect(codegen).toBe('codegen-js --root /tmp');
+
+      const release = execFileSync(
+        localnetBin,
+        ['prepare-release', '--changelog-repo', 'Fairmint/canton-assets'],
+        {
+          encoding: 'utf8',
+        }
+      );
+      expect(release).toBe('prepare-release --changelog-repo Fairmint/canton-assets');
     } finally {
       rmSync(packageRoot, { recursive: true, force: true });
     }

@@ -1,4 +1,9 @@
-import { selectReleaseVersion } from '../../../scripts/prepare-release';
+import {
+  selectReleaseVersion,
+  parseVersion,
+  parseChangelogRepo,
+  pickLatestSemver,
+} from '../../../scripts/prepare-release';
 
 describe('selectReleaseVersion', (): void => {
   const withTakenVersions = (...versions: string[]) => {
@@ -31,5 +36,28 @@ describe('selectReleaseVersion', (): void => {
   it('patch-bumps when npm already has the package.json floor version', (): void => {
     // Mirrors the first post-bootstrap publish: npm has 0.1.0, manifest still says 0.1.0.
     expect(selectReleaseVersion('0.1.0', '0.1.0', withTakenVersions('0.1.0'))).toBe('0.1.1');
+  });
+
+  it('rejects non-exact semver before selecting a version', (): void => {
+    expect(parseVersion('01.2.3')).toBeNull();
+    expect(() => selectReleaseVersion('1..2', null, withTakenVersions())).toThrow(
+      /Invalid version format/
+    );
+  });
+
+  it('parses github repos whose names contain dots', (): void => {
+    expect(parseChangelogRepo('https://github.com/acme/sdk.js.git')).toBe('acme/sdk.js');
+  });
+});
+
+describe('pickLatestSemver', (): void => {
+  it('uses semver compare instead of lexicographic string sort', (): void => {
+    // Lexicographic sort would pick "0.9.0" over "0.10.0".
+    expect(pickLatestSemver(['0.9.0', '0.10.0', '0.2.0'])).toBe('0.10.0');
+  });
+
+  it('ignores non-exact versions and returns null when none parse', (): void => {
+    expect(pickLatestSemver(['1.0.0-beta', '01.2.3', 'latest'])).toBeNull();
+    expect(pickLatestSemver(['1.0.0-beta', '2.0.0'])).toBe('2.0.0');
   });
 });
