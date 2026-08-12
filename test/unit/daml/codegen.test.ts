@@ -166,8 +166,8 @@ describe('fixSpliceRefs', (): void => {
       writeFileSync(
         join(dir, 'Holding.js'),
         [
-          "var pkgabcdef0123456789abcdef0123456789abcdef0123456789abcdef01234567 = require('@fairmint/splice-api-token-metadata-v1-1.0.0');",
-          'exports.x = pkgabcdef0123456789abcdef0123456789abcdef0123456789abcdef01234567.Splice.Api.Token.MetadataV1.Metadata;',
+          "var pkgabcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789 = require('@fairmint/splice-api-token-metadata-v1-1.0.0');",
+          'exports.x = pkgabcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789.Splice.Api.Token.MetadataV1.Metadata;',
           '',
         ].join('\n')
       );
@@ -177,7 +177,7 @@ describe('fixSpliceRefs', (): void => {
 
       const js = readFileSync(join(dir, 'Holding.js'), 'utf8');
       expect(js).toContain(
-        'pkgabcdef0123456789abcdef0123456789abcdef0123456789abcdef01234567.Metadata'
+        'pkgabcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789.Metadata'
       );
       expect(js).not.toContain('Splice.Api.Token.MetadataV1.Metadata');
       expect(js).toContain('__bundled__/splice-api-token-metadata-v1');
