@@ -174,7 +174,9 @@ export function resolvePublishedNpmState(packageName: string): {
 
   throw new Error(
     `Unable to determine published versions for ${packageName} (failing closed). ` +
-      `registry: ${registry.message}; npm view: ${npmView.message}`
+      `registry: ${registry.message}; npm view: ${
+        npmView.kind === 'error' ? npmView.message : 'package not found (ambiguous after registry error)'
+      }`
   );
 }
 
