@@ -79,11 +79,11 @@ Prefer Dev Tools pin defaults; only set `CANTON_LOCALNET_*` overrides for intent
 
 After `start` / `readiness`:
 
-| Service | URL |
-| --- | --- |
-| Ledger JSON API | `http://localhost:3975/v2/version` |
-| Scan | `http://scan.localhost:4000/api/scan/v0/dso-party-id` |
-| Validator | `http://localhost:3903/` (200/401) |
+| Service         | URL                                                   |
+| --------------- | ----------------------------------------------------- |
+| Ledger JSON API | `http://localhost:3975/v2/version`                    |
+| Scan            | `http://scan.localhost:4000/api/scan/v0/dso-party-id` |
+| Validator       | `http://localhost:3903/` (200/401)                    |
 
 See `npx canton-dev-tools diagnostics` and [`.github/workflows/localnet-smoke.yml`](./.github/workflows/localnet-smoke.yml) for the CI smoke path.
 
