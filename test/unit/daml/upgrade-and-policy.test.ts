@@ -352,9 +352,9 @@ describe('dar version policy extra watch paths', (): void => {
 
   it('parses --extra-policy-paths as CSV and/or repeatable flags', (): void => {
     expect(parseExtraPolicyPathsArg(['--all'])).toBeUndefined();
-    expect(parseExtraPolicyPathsArg(['--extra-policy-paths', 'scripts/codegen,libs/splice'])).toEqual(
-      ['scripts/codegen', 'libs/splice']
-    );
+    expect(
+      parseExtraPolicyPathsArg(['--extra-policy-paths', 'scripts/codegen,libs/splice'])
+    ).toEqual(['scripts/codegen', 'libs/splice']);
     expect(
       parseExtraPolicyPathsArg([
         '--extra-policy-paths',

@@ -1,11 +1,4 @@
-import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -24,10 +17,7 @@ function writePair(dir: string, base: string, js: string, dts = 'export {};\n'):
 
 function scaffoldRepo(): string {
   const root = mkdtempSync(join(tmpdir(), 'daml-js-bundle-'));
-  writeFileSync(
-    join(root, 'multi-package.yaml'),
-    `packages:\n- DemoPkg\n`
-  );
+  writeFileSync(join(root, 'multi-package.yaml'), `packages:\n- DemoPkg\n`);
   mkdirSync(join(root, 'DemoPkg'), { recursive: true });
   writeFileSync(
     join(root, 'DemoPkg', 'daml.yaml'),
@@ -81,7 +71,8 @@ export { Demo } ;
         name: '@fairmint/demo-daml-js',
         version: '0.0.1',
         dependencies: {
-          'daml.js/ghc-stdlib-DA-Internal-Template-1.0.0': 'file:../ghc-stdlib-DA-Internal-Template-1.0.0',
+          'daml.js/ghc-stdlib-DA-Internal-Template-1.0.0':
+            'file:../ghc-stdlib-DA-Internal-Template-1.0.0',
           'daml.js/daml-stdlib-DA-Time-Types-1.0.0': 'file:../daml-stdlib-DA-Time-Types-1.0.0',
         },
       },
@@ -155,9 +146,9 @@ describe('daml-js-bundle config', (): void => {
   });
 
   it('rejects unknown preset ids', (): void => {
-    expect(() =>
-      parseDamlJsBundleConfig({ presets: ['wrapped-assets'] }, 'test')
-    ).toThrow(/Invalid test.presets\[0\]/);
+    expect(() => parseDamlJsBundleConfig({ presets: ['wrapped-assets'] }, 'test')).toThrow(
+      /Invalid test.presets\[0\]/
+    );
   });
 
   it('rejects unsafe rootIndex.outputDir and copy paths', (): void => {
@@ -265,9 +256,9 @@ describe('bundleDependenciesForTarget', (): void => {
 
       expect(applied).toEqual(['da-internal-template', 'da-time-types']);
       expect(existsSync(join(pkgDir, 'lib/DA/Internal/Template/module.js'))).toBe(true);
-      expect(existsSync(join(pkgDir, 'lib/__bundled__/ghc-stdlib-DA-Internal-Template/index.js'))).toBe(
-        true
-      );
+      expect(
+        existsSync(join(pkgDir, 'lib/__bundled__/ghc-stdlib-DA-Internal-Template/index.js'))
+      ).toBe(true);
       expect(existsSync(join(pkgDir, 'lib/DA/Time/Types/module.js'))).toBe(true);
 
       const demoJs = readFileSync(join(pkgDir, 'lib/Demo/module.js'), 'utf8');
@@ -278,7 +269,9 @@ describe('bundleDependenciesForTarget', (): void => {
       const pkgJson = JSON.parse(readFileSync(join(pkgDir, 'package.json'), 'utf8')) as {
         dependencies?: Record<string, string>;
       };
-      expect(pkgJson.dependencies?.['daml.js/ghc-stdlib-DA-Internal-Template-1.0.0']).toBeUndefined();
+      expect(
+        pkgJson.dependencies?.['daml.js/ghc-stdlib-DA-Internal-Template-1.0.0']
+      ).toBeUndefined();
       expect(pkgJson.dependencies?.['daml.js/daml-stdlib-DA-Time-Types-1.0.0']).toBeUndefined();
 
       const mainIndex = readFileSync(join(pkgDir, 'lib/index.js'), 'utf8');
@@ -352,7 +345,9 @@ require('daml.js/splice-api-featured-app-v2-1.0.0');
       expect(pkgJson.dependencies?.['daml.js/daml-stdlib-DA-Time-Types-1.0.0']).toBe(
         'file:../daml-stdlib-DA-Time-Types-1.0.0'
       );
-      expect(pkgJson.dependencies?.['daml.js/ghc-stdlib-DA-Internal-Template-1.0.0']).toBeUndefined();
+      expect(
+        pkgJson.dependencies?.['daml.js/ghc-stdlib-DA-Internal-Template-1.0.0']
+      ).toBeUndefined();
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
@@ -366,10 +361,7 @@ require('daml.js/splice-api-featured-app-v2-1.0.0');
 
       // Only materialize HoldingV1 — leave the other five token packages missing.
       writePair(
-        join(
-          root,
-          'generated/js/splice-api-token-holding-v1-1.0.0/lib/Splice/Api/Token/HoldingV1'
-        ),
+        join(root, 'generated/js/splice-api-token-holding-v1-1.0.0/lib/Splice/Api/Token/HoldingV1'),
         'module',
         `"use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
@@ -378,10 +370,7 @@ exports.Holding = {};
         `export declare const Holding: object;\n`
       );
       writePair(
-        join(
-          root,
-          'generated/js/splice-api-token-holding-v1-1.0.0/lib/Splice/Api/Token/HoldingV1'
-        ),
+        join(root, 'generated/js/splice-api-token-holding-v1-1.0.0/lib/Splice/Api/Token/HoldingV1'),
         'index',
         `"use strict";
 Object.defineProperty(exports, "__esModule", { value: true });

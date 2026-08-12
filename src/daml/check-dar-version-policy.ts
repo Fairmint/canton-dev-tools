@@ -107,7 +107,11 @@ function loadWatchPathsFromPackageJson(rootDir: string): string[] | undefined {
   }
   const cantonDevTools = Reflect.get(parsed, 'cantonDevTools');
   if (cantonDevTools === undefined) return undefined;
-  if (typeof cantonDevTools !== 'object' || cantonDevTools === null || Array.isArray(cantonDevTools)) {
+  if (
+    typeof cantonDevTools !== 'object' ||
+    cantonDevTools === null ||
+    Array.isArray(cantonDevTools)
+  ) {
     throw new Error(`Invalid package.json cantonDevTools (expected object): ${packageJsonPath}`);
   }
   return readStringArrayField(

@@ -1,11 +1,4 @@
-import {
-  mkdtempSync,
-  mkdirSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-  existsSync,
-} from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -24,7 +17,11 @@ import {
   fixSpliceRefs,
   updateGeneratedPackages,
 } from '../../../src/daml/codegen';
-import { parseChangelogRepo, parseVersion, selectReleaseVersion } from '../../../src/prepare-release';
+import {
+  parseChangelogRepo,
+  parseVersion,
+  selectReleaseVersion,
+} from '../../../src/prepare-release';
 
 describe('collapseManifestLines', (): void => {
   it('drops map files and collapses js/d.ts pairs', (): void => {
@@ -79,7 +76,7 @@ describe('generated output helpers', (): void => {
         source.replace(/daml\.js\/foo/g, ctx.isDts ? './rel' : './rel')
       );
       expect(rewritten).toBe(2);
-      expect(readFileSync(join(dir, 'mod.js'), 'utf8')).toContain("./rel");
+      expect(readFileSync(join(dir, 'mod.js'), 'utf8')).toContain('./rel');
 
       writeGeneratedOutputPair(dir, 'other', {
         js: "require('@fairmint/splice-api-token-metadata-v1-1.0.0');\n",

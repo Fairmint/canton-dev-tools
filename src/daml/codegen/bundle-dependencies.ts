@@ -173,10 +173,7 @@ function updateMainIndex(targetDir: string): void {
   }
 }
 
-function removeLocalDependencies(
-  targetDir: string,
-  deps: string[]
-): void {
+function removeLocalDependencies(targetDir: string, deps: string[]): void {
   console.log('🗑️  Removing local dependencies from package.json...');
   const packageJsonPath = path.join(targetDir, 'package.json');
   if (!fs.existsSync(packageJsonPath)) {
@@ -310,9 +307,11 @@ export function bundleDependenciesForTarget(options: {
   return applied;
 }
 
-export function bundleDependencies(
-  options: BundleDependenciesOptions
-): { config: ResolvedDamlJsBundleConfig; processed: string[]; applied: Record<string, BundlePresetId[]> } {
+export function bundleDependencies(options: BundleDependenciesOptions): {
+  config: ResolvedDamlJsBundleConfig;
+  processed: string[];
+  applied: Record<string, BundlePresetId[]>;
+} {
   const config = resolveDamlJsBundleConfig({
     rootDir: options.rootDir,
     configPath: options.configPath,

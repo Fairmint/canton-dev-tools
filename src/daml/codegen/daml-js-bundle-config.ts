@@ -140,10 +140,7 @@ function parsePins(raw: unknown, label: string): DamlJsBundlePins {
   return pins;
 }
 
-function parseTemplateConstants(
-  raw: unknown,
-  label: string
-): RootIndexConfig['templateConstants'] {
+function parseTemplateConstants(raw: unknown, label: string): RootIndexConfig['templateConstants'] {
   if (raw === undefined) return undefined;
   if (!isRecord(raw)) {
     throw new Error(`Invalid ${label} (expected object)`);
@@ -199,13 +196,15 @@ function parseRootIndex(raw: unknown, label: string): RootIndexConfig {
     sourcePackage[key] = value;
   }
   if (!sourcePackage.name && !sourcePackage.namePrefix && !sourcePackage.key) {
-    throw new Error(
-      `${label}.sourcePackage requires at least one of name, namePrefix, or key`
-    );
+    throw new Error(`${label}.sourcePackage requires at least one of name, namePrefix, or key`);
   }
 
   const copyRaw = raw['copy'];
-  if (!Array.isArray(copyRaw) || copyRaw.length === 0 || !copyRaw.every((v) => typeof v === 'string')) {
+  if (
+    !Array.isArray(copyRaw) ||
+    copyRaw.length === 0 ||
+    !copyRaw.every((v) => typeof v === 'string')
+  ) {
     throw new Error(`Invalid ${label}.copy (expected non-empty string[])`);
   }
   const copy = (copyRaw as string[]).map((entry, index) => {
@@ -260,7 +259,10 @@ function parseRootIndex(raw: unknown, label: string): RootIndexConfig {
     sourcePackage,
     copy,
     namespaces: namespacesRaw as string[],
-    templateConstants: parseTemplateConstants(raw['templateConstants'], `${label}.templateConstants`),
+    templateConstants: parseTemplateConstants(
+      raw['templateConstants'],
+      `${label}.templateConstants`
+    ),
     ...(postBundlePresets ? { postBundlePresets } : {}),
     ...(typeof patchBundledImports === 'boolean' ? { patchBundledImports } : {}),
   };
@@ -272,7 +274,10 @@ export function parseDamlJsBundleConfig(raw: unknown, label: string): DamlJsBund
   }
 
   const generatedJsDir = raw['generatedJsDir'];
-  if (generatedJsDir !== undefined && (typeof generatedJsDir !== 'string' || generatedJsDir.length === 0)) {
+  if (
+    generatedJsDir !== undefined &&
+    (typeof generatedJsDir !== 'string' || generatedJsDir.length === 0)
+  ) {
     throw new Error(`Invalid ${label}.generatedJsDir`);
   }
 

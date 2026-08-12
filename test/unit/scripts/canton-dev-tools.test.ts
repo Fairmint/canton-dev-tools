@@ -225,9 +225,13 @@ describe('canton-dev-tools DAML command dispatch', (): void => {
       });
       expect(codegen).toBe('codegen-js --root /tmp');
 
-      const release = execFileSync(localnetBin, ['prepare-release', '--changelog-repo', 'Fairmint/canton-assets'], {
-        encoding: 'utf8',
-      });
+      const release = execFileSync(
+        localnetBin,
+        ['prepare-release', '--changelog-repo', 'Fairmint/canton-assets'],
+        {
+          encoding: 'utf8',
+        }
+      );
       expect(release).toBe('prepare-release --changelog-repo Fairmint/canton-assets');
     } finally {
       rmSync(packageRoot, { recursive: true, force: true });

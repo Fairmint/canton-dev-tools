@@ -9,11 +9,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { GeneratedImportRewriteRule } from './generated-output-helpers';
 import { writeGeneratedOutputPair } from './generated-output-helpers';
-import {
-  copyDirectory,
-  createDirectoryIfNotExists,
-  createNamespaceIndexDts,
-} from './bundle-fs';
+import { copyDirectory, createDirectoryIfNotExists, createNamespaceIndexDts } from './bundle-fs';
 
 export const BUNDLE_PRESET_IDS = [
   'da-internal-template',
@@ -54,12 +50,7 @@ function packageDir(generatedJsDir: string, nameWithVersion: string): string {
   return path.join(generatedJsDir, nameWithVersion);
 }
 
-function ensureWrapper(
-  targetDir: string,
-  wrapperName: string,
-  js: string,
-  dts: string
-): void {
+function ensureWrapper(targetDir: string, wrapperName: string, js: string, dts: string): void {
   const wrapperDir = path.join(targetDir, 'lib', '__bundled__', wrapperName);
   writeGeneratedOutputPair(wrapperDir, 'index', { js, dts });
 }
@@ -96,11 +87,7 @@ exports.${childName} = ${childName};
   });
 }
 
-function copyModuleTreeOrWarn(
-  sourceDir: string,
-  destDir: string,
-  label: string
-): boolean {
+function copyModuleTreeOrWarn(sourceDir: string, destDir: string, label: string): boolean {
   if (!fs.existsSync(sourceDir)) {
     console.log(`⚠️  ${label} not found at ${sourceDir}`);
     return false;
@@ -448,7 +435,9 @@ export declare const Splice: { Api: { FeaturedAppRightV2: typeof FeaturedAppRigh
         packageDir(ctx.generatedJsDir, 'daml-stdlib-DA-Time-Types-1.0.0'),
         'lib/DA/Time'
       );
-      if (!copyModuleTreeOrWarn(sourceDir, path.join(ctx.targetDir, 'lib/DA/Time'), 'DA Time Types')) {
+      if (
+        !copyModuleTreeOrWarn(sourceDir, path.join(ctx.targetDir, 'lib/DA/Time'), 'DA Time Types')
+      ) {
         return false;
       }
       ensureWrapper(
@@ -528,7 +517,9 @@ export declare const DA: { Types: typeof Types };
         packageDir(ctx.generatedJsDir, 'daml-stdlib-DA-Set-Types-1.0.0'),
         'lib/DA/Set'
       );
-      if (!copyModuleTreeOrWarn(sourceDir, path.join(ctx.targetDir, 'lib/DA/Set'), 'DA Set Types')) {
+      if (
+        !copyModuleTreeOrWarn(sourceDir, path.join(ctx.targetDir, 'lib/DA/Set'), 'DA Set Types')
+      ) {
         return false;
       }
       ensureWrapper(
@@ -557,8 +548,7 @@ export declare const DA: { Set: { Types: typeof Types } };
 
   'splice-token-v1': {
     id: 'splice-token-v1',
-    importSpecs: () =>
-      TOKEN_V1_PACKAGES.flatMap((pkg) => importVariants(pkg.dirName)),
+    importSpecs: () => TOKEN_V1_PACKAGES.flatMap((pkg) => importVariants(pkg.dirName)),
     detectionTargets: (targetDir) => [
       path.join(targetDir, 'lib', 'Splice', 'Api', 'Token', 'BurnMintV1'),
       path.join(targetDir, 'lib', 'Splice', 'Api', 'Token', 'MetadataV1'),
@@ -617,12 +607,12 @@ export declare const Splice: { Api: { Token: { ${pkg.wrapperKey}: typeof mod } }
       return true;
     },
     rewriteRules: (targetDir) =>
-      TOKEN_V1_PACKAGES.filter((pkg) =>
-        fs.existsSync(path.join(targetDir, pkg.relModule))
-      ).map((pkg) => ({
-        importPaths: importVariants(pkg.dirName),
-        resolveTarget: () => path.join(targetDir, 'lib/__bundled__', pkg.wrapperName),
-      })),
+      TOKEN_V1_PACKAGES.filter((pkg) => fs.existsSync(path.join(targetDir, pkg.relModule))).map(
+        (pkg) => ({
+          importPaths: importVariants(pkg.dirName),
+          resolveTarget: () => path.join(targetDir, 'lib/__bundled__', pkg.wrapperName),
+        })
+      ),
   },
 
   'splice-token-standard-utils': {
@@ -640,7 +630,13 @@ export declare const Splice: { Api: { Token: { ${pkg.wrapperKey}: typeof mod } }
         copyDirectory(sourceDir, path.join(ctx.targetDir, 'lib/Splice/TokenStandard'));
       } else {
         const alt = path.join(depRoot, 'lib/Splice');
-        if (!copyModuleTreeOrWarn(alt, path.join(ctx.targetDir, 'lib/Splice'), 'splice-token-standard-utils')) {
+        if (
+          !copyModuleTreeOrWarn(
+            alt,
+            path.join(ctx.targetDir, 'lib/Splice'),
+            'splice-token-standard-utils'
+          )
+        ) {
           return false;
         }
       }

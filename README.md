@@ -74,17 +74,17 @@ npx canton-dev-tools fix-splice-refs --target lib
 
 Built-in presets (stdlib / Splice only):
 
-| Preset id | Bundles |
-|---|---|
-| `da-internal-template` | `ghc-stdlib-DA-Internal-Template` (always applied) |
-| `featured-app-v1` | `splice-api-featured-app-v1` |
-| `featured-app-v2` | `splice-api-featured-app-v2` (only when amulet needs it) |
-| `amulet` | `splice-amulet-<pin>` |
-| `da-time-types` | `daml-stdlib-DA-Time-Types` |
-| `da-types` | `daml-prim-DA-Types` |
-| `da-set-types` | `daml-stdlib-DA-Set-Types` |
-| `splice-token-v1` | token burn/mint, metadata, holding, allocation*, transfer-instruction |
-| `splice-token-standard-utils` | `splice-token-standard-utils-<pin>` |
+| Preset id                     | Bundles                                                                |
+| ----------------------------- | ---------------------------------------------------------------------- |
+| `da-internal-template`        | `ghc-stdlib-DA-Internal-Template` (always applied)                     |
+| `featured-app-v1`             | `splice-api-featured-app-v1`                                           |
+| `featured-app-v2`             | `splice-api-featured-app-v2` (only when amulet needs it)               |
+| `amulet`                      | `splice-amulet-<pin>`                                                  |
+| `da-time-types`               | `daml-stdlib-DA-Time-Types`                                            |
+| `da-types`                    | `daml-prim-DA-Types`                                                   |
+| `da-set-types`                | `daml-stdlib-DA-Set-Types`                                             |
+| `splice-token-v1`             | token burn/mint, metadata, holding, allocation\*, transfer-instruction |
+| `splice-token-standard-utils` | `splice-token-standard-utils-<pin>`                                    |
 
 Pins (optional): `pins.amulet` (default `0.1.19`), `pins.tokenStandardUtils` (default `2.0.0`).
 
@@ -262,7 +262,11 @@ Optional overrides, in order:
 ### Library import
 
 ```ts
-import { prepareBuild, discoverManagedPackages, runCodegenJs } from '@fairmint/canton-dev-tools/daml';
+import {
+  prepareBuild,
+  discoverManagedPackages,
+  runCodegenJs,
+} from '@fairmint/canton-dev-tools/daml';
 ```
 
 ## TypeScript helpers

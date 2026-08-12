@@ -63,7 +63,9 @@ export function findUnresolvedPackageImports(
 }
 
 /** Verify published lib has no unresolved daml.js / @fairmint codegen imports. */
-export function verifyPackageImports(options: VerifyPackageImportsOptions): UnresolvedImportIssue[] {
+export function verifyPackageImports(
+  options: VerifyPackageImportsOptions
+): UnresolvedImportIssue[] {
   const libDir = path.resolve(options.libDir);
   console.log(`🔍 Checking for unresolved daml.js/ imports in ${libDir}...\n`);
 

@@ -89,9 +89,7 @@ function renderTemplateConstantsJs(
       const field = entry.field ?? 'templateId';
       fields.push(`    ${entryName}: ${varName}.${entry.binding}.${field},`);
     }
-    exports.push(
-      `exports.${constName} = Object.freeze({\n${fields.join('\n')}\n});`
-    );
+    exports.push(`exports.${constName} = Object.freeze({\n${fields.join('\n')}\n});`);
   }
 
   return { requires, exports };
@@ -113,13 +111,9 @@ function renderTemplateConstantsDts(
         imports.push(`import * as ${varName} from '${entry.from}';`);
       }
       const field = entry.field ?? 'templateId';
-      fields.push(
-        `  readonly ${entryName}: typeof ${varName}.${entry.binding}.${field};`
-      );
+      fields.push(`  readonly ${entryName}: typeof ${varName}.${entry.binding}.${field};`);
     }
-    declarations.push(
-      `export declare const ${constName}: {\n${fields.join('\n')}\n};`
-    );
+    declarations.push(`export declare const ${constName}: {\n${fields.join('\n')}\n};`);
   }
 
   return { imports, declarations };
@@ -135,10 +129,7 @@ function writeRootIndexFiles(
   const dtsConstants = renderTemplateConstantsDts(constants);
 
   const namespaceRequires = namespaces
-    .map(
-      (ns) =>
-        `var ${ns} = require('./${ns}');\nexports.${ns} = ${ns};`
-    )
+    .map((ns) => `var ${ns} = require('./${ns}');\nexports.${ns} = ${ns};`)
     .join('\n');
 
   const indexJs = `"use strict";
@@ -153,9 +144,7 @@ ${jsConstants.requires.join('\n')}
 ${jsConstants.exports.join('\n')}
 `;
 
-  const namespaceImports = namespaces
-    .map((ns) => `import * as ${ns} from './${ns}';`)
-    .join('\n');
+  const namespaceImports = namespaces.map((ns) => `import * as ${ns} from './${ns}';`).join('\n');
   const namespaceExport = `export { ${namespaces.join(', ')} };`;
 
   const indexDts = `${namespaceImports}
