@@ -2,6 +2,8 @@
 
 `@fairmint/canton-dev-tools` is the **central owner** of Fairmint's shared Canton LocalNet pin set.
 
+For CLI usage, prerequisites, consumer wiring, and ready endpoints, see the [README LocalNet section](./README.md#localnet).
+
 Consumers should prefer this package's CLI defaults in `bin/canton-dev-tools` (kept in sync with
 `package.json#config` by `pack:check`) instead of maintaining divergent pins in individual SDKs.
 `npm run localnet*` delegates to the binary, which applies the four pins and oauth2 auth as
