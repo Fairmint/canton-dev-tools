@@ -28,16 +28,7 @@ concurrency:
 jobs:
   publish:
     runs-on: ubuntu-latest
-    # Skip CI autofix pushes (and explicit [skip publish]): prepare-release always
-    # patch-bumps from npm latest, so a lint-only main push would cut another release.
-    # workflow_dispatch always runs. PAT autofix sets actor to the PAT owner, so the
-    # commit message is the reliable signal; actor check covers GITHUB_TOKEN pushes.
-    if: >
-      github.ref == 'refs/heads/main' &&
-      (github.event_name != 'push' ||
-        (!contains(github.event.head_commit.message, 'ci: auto-fix') &&
-         !contains(github.event.head_commit.message, '[skip publish]') &&
-         github.actor != 'github-actions[bot]'))
+    if: github.ref == 'refs/heads/main'
     permissions:
       contents: write
       packages: write
