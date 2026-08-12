@@ -50,6 +50,9 @@ DAML package commands (from a multi-package repo root):
   sync-splice-dars [--config <path>] [--force]
   install-dpm-sdks
   codegen-js [--root <dir>] [--skip-dpm]
+  bundle-dependencies [--root <dir>] [--config <path>]
+  create-root-index [--root <dir>] [--config <path>]
+  fix-splice-refs [--root <dir>] [--target <dir>]
   prepare-release [--root <dir>] [--changelog-repo owner/repo]
   collapse-manifest
 
@@ -57,6 +60,8 @@ One-liners:
   npx @fairmint/canton-dev-tools start
   npx @fairmint/canton-dev-tools prepare-build
   npx @fairmint/canton-dev-tools codegen-js
+  npx @fairmint/canton-dev-tools bundle-dependencies
+  npx @fairmint/canton-dev-tools create-root-index
 
 Environment:
   CANTON_LOCALNET_QUICKSTART_DIR     Use an existing cn-quickstart/quickstart directory
@@ -216,7 +221,7 @@ main() {
       fi
       exit 0
       ;;
-    prepare-build | verify-dars | backup-dar | check-dar-version-policy | check-upgrade-compat | check-upgrade-compatibility | sync-splice-dars | codegen-js | prepare-release | collapse-manifest)
+    prepare-build | verify-dars | backup-dar | check-dar-version-policy | check-upgrade-compat | check-upgrade-compatibility | sync-splice-dars | codegen-js | bundle-dependencies | create-root-index | fix-splice-refs | prepare-release | collapse-manifest)
       shift || true
       run_daml_cli "${command}" "$@"
       ;;

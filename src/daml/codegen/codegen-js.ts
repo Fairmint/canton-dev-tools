@@ -5,9 +5,10 @@
  * update-generated-package → create-package-index → fix-splice-refs
  * on generated JS trees.
  *
- * Consumer-specific steps stay local for Phase 2:
+ * Phase 2 (config-driven, separate CLI):
  * - bundle-dependencies
  * - create-root-index
+ * - fix-splice-refs --target <merged-lib>
  */
 
 import { spawnSync } from 'node:child_process';
@@ -125,8 +126,8 @@ export function runCodegenJs(options: CodegenJsOptions): CodegenJsResult {
 
   console.log(
     `codegen-js complete for ${packages.map((pkg) => pkg.name).join(', ')}. ` +
-      'Consumer steps still required: bundle-dependencies → create-root-index → ' +
-      'fix-splice-refs (on merged lib/) → build:ts.'
+      'Next: canton-dev-tools bundle-dependencies → create-root-index → ' +
+      'fix-splice-refs --target <merged-lib> → build:ts.'
   );
 
   return { packages, updatedDirs };

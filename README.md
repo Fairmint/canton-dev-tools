@@ -42,6 +42,9 @@ npx canton-dev-tools check-dar-version-policy --extra-policy-paths scripts/codeg
 npx canton-dev-tools check-upgrade-compat
 npx canton-dev-tools sync-splice-dars
 npx canton-dev-tools codegen-js
+npx canton-dev-tools bundle-dependencies
+npx canton-dev-tools create-root-index
+npx canton-dev-tools fix-splice-refs --target lib
 npx canton-dev-tools prepare-release --changelog-repo Fairmint/canton-assets
 ```
 
@@ -56,7 +59,127 @@ Generic DAML → JS bindings steps for packages that declare `codegen.js` in `da
 3. Write per-package `index.js` / `index.d.ts`
 4. Fix Splice namespace refs on generated `lib/` trees (optional `@fairmint/*` → `__bundled__` rewrite when present)
 
-**Still consumer-local (Phase 2):** `bundle-dependencies`, `create-root-index`, merged-lib verify lists.
+### Phase 2: `bundle-dependencies` + `create-root-index`
+
+Config-driven stdlib/Splice bundling and merged published `lib/` creation. Driven by
+`daml-js-bundle.json` (or `--config` / `package.json` → `cantonDevTools.damlJsBundle`).
+**No product package names are hardcoded** in canton-dev-tools — consumers select presets and
+describe their root index in JSON.
+
+```bash
+npx canton-dev-tools bundle-dependencies [--root <dir>] [--config <path>]
+npx canton-dev-tools create-root-index [--root <dir>] [--config <path>]
+npx canton-dev-tools fix-splice-refs --target lib
+```
+
+Built-in presets (stdlib / Splice only):
+
+| Preset id | Bundles |
+|---|---|
+| `da-internal-template` | `ghc-stdlib-DA-Internal-Template` (always applied) |
+| `featured-app-v1` | `splice-api-featured-app-v1` |
+| `featured-app-v2` | `splice-api-featured-app-v2` (only when amulet needs it) |
+| `amulet` | `splice-amulet-<pin>` |
+| `da-time-types` | `daml-stdlib-DA-Time-Types` |
+| `da-types` | `daml-prim-DA-Types` |
+| `da-set-types` | `daml-stdlib-DA-Set-Types` |
+| `splice-token-v1` | token burn/mint, metadata, holding, allocation*, transfer-instruction |
+| `splice-token-standard-utils` | `splice-token-standard-utils-<pin>` |
+
+Pins (optional): `pins.amulet` (default `0.1.19`), `pins.tokenStandardUtils` (default `2.0.0`).
+
+Example `daml-js-bundle.json` (assets-like shape; product names belong in the **consumer** config):
+
+```json
+{
+  "generatedJsDir": "generated/js",
+  "presets": [
+    "da-internal-template",
+    "featured-app-v1",
+    "featured-app-v2",
+    "amulet",
+    "da-time-types",
+    "da-types",
+    "da-set-types",
+    "splice-token-v1",
+    "splice-token-standard-utils"
+  ],
+  "pins": {
+    "amulet": "0.1.19",
+    "tokenStandardUtils": "2.0.0"
+  },
+  "rootIndex": {
+    "outputDir": "lib",
+    "sourcePackage": { "namePrefix": "WrappedAssets" },
+    "copy": ["DA", "Splice", "__bundled__", "WrappedAssets"],
+    "namespaces": ["WrappedAssets", "DA", "Splice"],
+    "templateConstants": {
+      "WRAPPED_ASSETS_TEMPLATES": {
+        "burnMintFactory": {
+          "from": "./WrappedAssets/BurnMint/module",
+          "binding": "WrappedAssetsBurnMintFactory"
+        },
+        "burnOffer": {
+          "from": "./WrappedAssets/BurnOffer/module",
+          "binding": "BurnOffer"
+        },
+        "wrappedAsset": {
+          "from": "./WrappedAssets/Holding/module",
+          "binding": "WrappedAsset"
+        },
+        "frozenWrappedAsset": {
+          "from": "./WrappedAssets/Holding/module",
+          "binding": "FrozenWrappedAsset"
+        }
+      }
+    },
+    "postBundlePresets": [
+      "da-time-types",
+      "da-types",
+      "splice-token-v1",
+      "splice-token-standard-utils",
+      "da-set-types"
+    ]
+  }
+}
+```
+
+Or point at the file from `package.json`:
+
+```json
+{
+  "cantonDevTools": {
+    "damlJsBundle": "./daml-js-bundle.json"
+  }
+}
+```
+
+Library imports:
+
+```ts
+import {
+  runCodegenJs,
+  bundleDependencies,
+  createRootIndex,
+  fixSpliceRefs,
+  resolveDamlJsBundleConfig,
+  BUNDLE_PRESET_IDS,
+} from '@fairmint/canton-dev-tools/daml';
+```
+
+Example consumer scripts:
+
+```json
+{
+  "scripts": {
+    "prepare-build": "canton-dev-tools prepare-build",
+    "codegen": "npm run build && canton-dev-tools codegen-js && canton-dev-tools bundle-dependencies && canton-dev-tools create-root-index && canton-dev-tools fix-splice-refs --target lib",
+    "prepare-release": "canton-dev-tools prepare-release"
+  }
+}
+```
+
+NFT / CapTable merge hooks stay consumer-local (out of scope for Phase 2).
 
 Optional publish suffixes in root `package.json` (multi-package repos):
 
@@ -73,7 +196,7 @@ Optional publish suffixes in root `package.json` (multi-package repos):
 
 `null` publishes as the root package name. A single codegen package defaults to the root name.
 
-Library imports:
+Library imports (Phase 1 helpers):
 
 ```ts
 import {
@@ -86,22 +209,6 @@ import {
   applyGeneratedImportRewrites,
 } from '@fairmint/canton-dev-tools/daml';
 ```
-
-Example consumer scripts:
-
-```json
-{
-  "scripts": {
-    "prepare-build": "canton-dev-tools prepare-build",
-    "codegen": "npm run build && canton-dev-tools codegen-js",
-    "prepare-release": "canton-dev-tools prepare-release",
-    "package:manifest": "… | canton-dev-tools collapse-manifest > generated/npm-manifest.txt",
-    "package:prep": "npm run codegen && npm run update-version && tsx scripts/bundle-dependencies.ts && tsx scripts/create-root-index.ts && tsx scripts/fix-splice-refs.ts"
-  }
-}
-```
-
-Prefer calling library helpers from thin consumer scripts when you need a custom step order (assets: bundle → create-root-index → fix-splice-refs on merged `lib/`).
 
 ### `check-dar-version-policy` extra watch paths
 
