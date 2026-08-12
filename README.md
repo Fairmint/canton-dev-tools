@@ -6,8 +6,16 @@ This package owns the versioned LocalNet lifecycle (start, readiness, diagnostic
 
 ## Docs
 
-- [Canton LocalNet testing](https://github.com/Fairmint/dev-docs/blob/main/docs/development/testing/canton-localnet.md)
-- [COMPATIBILITY.md](./COMPATIBILITY.md) — pinned LocalNet / Splice / scribe / protocol versions and auth defaults
+Canonical documentation lives in this repository:
+
+- [LocalNet](#localnet) — CLI, prerequisites, consumer setup, and ready endpoints
+- [COMPATIBILITY.md](./COMPATIBILITY.md) — pinned Quickstart / Splice / scribe / protocol versions and auth defaults
+- [DAML package CLI](#daml-package-cli) — multi-package build, DAR policy, and Splice DAR sync
+- [TypeScript helpers](#typescript-helpers) — `@fairmint/canton-dev-tools/testing`
+
+Implementation: [`bin/canton-dev-tools`](./bin/canton-dev-tools) and [`scripts/localnet-cloud.sh`](./scripts/localnet-cloud.sh). CI smoke: [`.github/workflows/localnet-smoke.yml`](./.github/workflows/localnet-smoke.yml).
+
+_Fairmint-internal cross-repo CI notes (non-canonical): [dev-docs canton-localnet](https://github.com/Fairmint/dev-docs/blob/main/docs/development/testing/canton-localnet.md)._
 
 ## Install
 
@@ -17,7 +25,19 @@ npm install -D @fairmint/canton-dev-tools
 
 Peer dependency: `@fairmint/canton-node-sdk` (for TypeScript helpers).
 
-## LocalNet CLI
+## LocalNet
+
+`@fairmint/canton-dev-tools` owns Fairmint's shared Canton LocalNet lifecycle. The CLI wraps [Canton Network Quickstart](https://docs.canton.network/appdev/quickstart) with pinned versions from [COMPATIBILITY.md](./COMPATIBILITY.md).
+
+### Prerequisites
+
+- Docker and Compose v2
+- First start pulls images and bootstraps Splice (~10–15 minutes on a cold cache)
+- Host aliases `scan.localhost`, `sv.localhost`, and `wallet.localhost` (the CLI adds them with passwordless `sudo` when available; otherwise add manually)
+
+In npm consumer packages the CLI fetches [cn-quickstart](https://github.com/digital-asset/cn-quickstart) at the pinned ref into `~/.cache/fairmint/canton-localnet` (override with `CANTON_LOCALNET_CACHE_DIR` / `CANTON_LOCALNET_QUICKSTART_DIR`). In a git checkout with `libs/cn-quickstart`, submodule init is used instead.
+
+### CLI
 
 ```bash
 npx canton-dev-tools start
@@ -26,7 +46,46 @@ npx canton-dev-tools diagnostics
 npx canton-dev-tools teardown
 ```
 
-The binary hardcodes the four LocalNet pins from [COMPATIBILITY.md](./COMPATIBILITY.md). Auth defaults to **oauth2** (Keycloak). Consumer CI that uses HS256 JWTs should set `CANTON_LOCALNET_AUTH_MODE=shared-secret`.
+Auth defaults to **oauth2** (Keycloak). Consumer CI that signs HS256 JWTs should set `CANTON_LOCALNET_AUTH_MODE=shared-secret` (see [COMPATIBILITY.md](./COMPATIBILITY.md)).
+
+### Scripts in this repo
+
+```bash
+npm run localnet:start
+npm run localnet:readiness
+npm run localnet:diagnostics
+npm run localnet:teardown
+npm run localnet:cip56-transfer   # Splice TestTokenV2 CIP-56 / CIP-112 smoke
+```
+
+### Wire up a consumer package
+
+Expose `localnet:*` scripts that delegate to the binary. Shared-secret auth is typical for CI:
+
+```json
+{
+  "scripts": {
+    "localnet": "CANTON_LOCALNET_AUTH_MODE=shared-secret canton-dev-tools",
+    "localnet:start": "npm run -s localnet -- start",
+    "localnet:readiness": "npm run -s localnet -- readiness",
+    "localnet:teardown": "npm run -s localnet -- teardown"
+  }
+}
+```
+
+Prefer Dev Tools pin defaults; only set `CANTON_LOCALNET_*` overrides for intentional experiments.
+
+### Ready endpoints
+
+After `start` / `readiness`:
+
+| Service         | URL                                                   |
+| --------------- | ----------------------------------------------------- |
+| Ledger JSON API | `http://localhost:3975/v2/version`                    |
+| Scan            | `http://scan.localhost:4000/api/scan/v0/dso-party-id` |
+| Validator       | `http://localhost:3903/` (200/401)                    |
+
+See `npx canton-dev-tools diagnostics` and [`.github/workflows/localnet-smoke.yml`](./.github/workflows/localnet-smoke.yml) for the CI smoke path.
 
 ## DAML package CLI
 
