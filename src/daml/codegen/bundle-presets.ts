@@ -572,23 +572,32 @@ export declare const DA: { Set: { Types: typeof Types } };
     ],
     apply: (ctx) => {
       console.log('📦 Bundling Splice API Token dependencies...');
-      let copiedCount = 0;
+      const copied: typeof TOKEN_V1_PACKAGES = [];
       for (const pkg of TOKEN_V1_PACKAGES) {
         const sourceDir = path.join(packageDir(ctx.generatedJsDir, pkg.dirName), pkg.relModule);
         const destDir = path.join(ctx.targetDir, pkg.relModule);
         if (fs.existsSync(sourceDir)) {
           copyDirectory(sourceDir, destDir);
           console.log(`✅ Copied ${pkg.wrapperName}`);
-          copiedCount += 1;
+          copied.push(pkg);
+        } else {
+          console.log(`⚠️  ${pkg.wrapperName} not found at ${sourceDir}`);
         }
       }
 
-      if (copiedCount === 0) {
+      if (copied.length === 0) {
         console.log('⚠️  No splice-api-token-v1 source packages found');
         return false;
       }
 
-      for (const pkg of TOKEN_V1_PACKAGES) {
+      if (copied.length < TOKEN_V1_PACKAGES.length) {
+        console.log(
+          `⚠️  Partial splice-token-v1 bundle: ${copied.length}/${TOKEN_V1_PACKAGES.length} packages copied`
+        );
+      }
+
+      // Only emit wrappers for packages that actually landed — rewriteRules filters the same way.
+      for (const pkg of copied) {
         const relPath = `../../Splice/Api/Token/${pkg.wrapperKey}`;
         ensureWrapper(
           ctx.targetDir,
@@ -608,7 +617,9 @@ export declare const Splice: { Api: { Token: { ${pkg.wrapperKey}: typeof mod } }
       return true;
     },
     rewriteRules: (targetDir) =>
-      TOKEN_V1_PACKAGES.map((pkg) => ({
+      TOKEN_V1_PACKAGES.filter((pkg) =>
+        fs.existsSync(path.join(targetDir, pkg.relModule))
+      ).map((pkg) => ({
         importPaths: importVariants(pkg.dirName),
         resolveTarget: () => path.join(targetDir, 'lib/__bundled__', pkg.wrapperName),
       })),

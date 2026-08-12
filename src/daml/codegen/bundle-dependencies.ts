@@ -285,8 +285,11 @@ export function bundleDependenciesForTarget(options: {
       continue;
     }
     applied.push(preset.id);
-    rewriteRules.push(...preset.rewriteRules(targetDir, options.pins));
-    packageJsonDeps.push(...preset.importSpecs(options.pins));
+    // Derive cleanup keys from rewrite rules so partial presets (e.g. splice-token-v1)
+    // only strip deps for packages that actually materialized.
+    const rules = preset.rewriteRules(targetDir, options.pins);
+    rewriteRules.push(...rules);
+    packageJsonDeps.push(...rules.flatMap((rule) => rule.importPaths));
   }
 
   ensureBundledDANamespaceIndexes(targetDir);

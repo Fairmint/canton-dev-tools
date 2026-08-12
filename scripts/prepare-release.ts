@@ -17,8 +17,10 @@ if (require.main === module) {
 }
 
 export {
+  compareVersions,
   parseChangelogRepo,
   parseVersion,
+  pickLatestSemver,
   prepareRelease,
   selectReleaseVersion,
 } from '../src/prepare-release';

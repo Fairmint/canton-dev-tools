@@ -255,22 +255,30 @@ export function createRootIndex(options: CreateRootIndexOptions): {
   writeRootIndexFiles(destLib, rootIndex.namespaces, rootIndex.templateConstants);
 
   const postPresets = rootIndex.postBundlePresets ?? [];
-  if (postPresets.length > 0) {
-    // Preset apply paths assume targetDir/lib/…; packageRoot is dirname(destLib).
-    applyBundlePresets({
-      targetDir: packageRoot,
-      generatedJsDir: config.absoluteGeneratedJsDir,
-      pins: config.pins,
-      presets: postPresets,
-    });
-  }
+  // Only presets that actually materialized are safe to rewrite onto __bundled__.
+  const appliedPostPresets =
+    postPresets.length > 0
+      ? applyBundlePresets({
+          targetDir: packageRoot,
+          generatedJsDir: config.absoluteGeneratedJsDir,
+          pins: config.pins,
+          presets: postPresets,
+        })
+      : [];
 
   const shouldPatch = rootIndex.patchBundledImports ?? true;
   if (shouldPatch) {
+    // config.presets are expected from an earlier bundle-dependencies + copy step;
+    // only rewrite when their bundled artifacts are present. postBundlePresets only
+    // rewrite when applyBundlePresets reported success (same gate as bundleDependenciesForTarget).
+    const candidatePresets = [...new Set([...config.presets, ...appliedPostPresets])];
+    const presetsToPatch = candidatePresets.filter((id) =>
+      BUNDLE_PRESETS[id].detectionTargets(packageRoot).some((target) => fs.existsSync(target))
+    );
     patchBundledDependencyImports(destLib, {
       generatedJsDir: config.absoluteGeneratedJsDir,
       pins: config.pins,
-      presets: [...new Set([...config.presets, ...postPresets])],
+      presets: presetsToPatch,
     });
   }
 

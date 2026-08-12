@@ -357,6 +357,99 @@ require('daml.js/splice-api-featured-app-v2-1.0.0');
       rmSync(root, { recursive: true, force: true });
     }
   });
+
+  it('partial splice-token-v1 only rewrites packages that copied', (): void => {
+    const root = scaffoldRepo();
+    try {
+      scaffoldDependencyTemplates(root);
+      const pkgDir = scaffoldGeneratedPackage(root);
+
+      // Only materialize HoldingV1 — leave the other five token packages missing.
+      writePair(
+        join(
+          root,
+          'generated/js/splice-api-token-holding-v1-1.0.0/lib/Splice/Api/Token/HoldingV1'
+        ),
+        'module',
+        `"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.Holding = {};
+`,
+        `export declare const Holding: object;\n`
+      );
+      writePair(
+        join(
+          root,
+          'generated/js/splice-api-token-holding-v1-1.0.0/lib/Splice/Api/Token/HoldingV1'
+        ),
+        'index',
+        `"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+function __export(m) { for (var p in m) exports[p] = m[p]; }
+__export(require('./module'));
+`,
+        `export * from './module';\n`
+      );
+
+      writePair(
+        join(pkgDir, 'lib', 'Demo'),
+        'module',
+        `"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+var holding = require('daml.js/splice-api-token-holding-v1-1.0.0');
+var burnMint = require('daml.js/splice-api-token-burn-mint-v1-1.0.0');
+exports.Demo = { holding: holding, burnMint: burnMint };
+`
+      );
+      writeFileSync(
+        join(pkgDir, 'package.json'),
+        JSON.stringify(
+          {
+            name: '@fairmint/demo-daml-js',
+            version: '0.0.1',
+            dependencies: {
+              'daml.js/splice-api-token-holding-v1-1.0.0':
+                'file:../splice-api-token-holding-v1-1.0.0',
+              'daml.js/splice-api-token-burn-mint-v1-1.0.0':
+                'file:../splice-api-token-burn-mint-v1-1.0.0',
+            },
+          },
+          null,
+          4
+        )
+      );
+
+      const applied = bundleDependenciesForTarget({
+        targetDir: pkgDir,
+        generatedJsDir: join(root, 'generated', 'js'),
+        pins: { amulet: '0.1.19', tokenStandardUtils: '2.0.0' },
+        presets: ['splice-token-v1'],
+        forcePresets: ['splice-token-v1'],
+      });
+
+      expect(applied).toEqual(['splice-token-v1']);
+      expect(existsSync(join(pkgDir, 'lib/Splice/Api/Token/HoldingV1/module.js'))).toBe(true);
+      expect(existsSync(join(pkgDir, 'lib/__bundled__/splice-api-token-holding-v1'))).toBe(true);
+      // Missing packages must not get stub wrappers.
+      expect(existsSync(join(pkgDir, 'lib/__bundled__/splice-api-token-burn-mint-v1'))).toBe(false);
+      expect(existsSync(join(pkgDir, 'lib/Splice/Api/Token/BurnMintV1'))).toBe(false);
+
+      const demoJs = readFileSync(join(pkgDir, 'lib/Demo/module.js'), 'utf8');
+      expect(demoJs).toContain('__bundled__/splice-api-token-holding-v1');
+      expect(demoJs).toContain("require('daml.js/splice-api-token-burn-mint-v1-1.0.0')");
+      expect(demoJs).not.toContain('__bundled__/splice-api-token-burn-mint-v1');
+
+      const pkgJson = JSON.parse(readFileSync(join(pkgDir, 'package.json'), 'utf8')) as {
+        dependencies?: Record<string, string>;
+      };
+      expect(pkgJson.dependencies?.['daml.js/splice-api-token-holding-v1-1.0.0']).toBeUndefined();
+      expect(pkgJson.dependencies?.['daml.js/splice-api-token-burn-mint-v1-1.0.0']).toBe(
+        'file:../splice-api-token-burn-mint-v1-1.0.0'
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('createRootIndex', (): void => {
@@ -418,6 +511,55 @@ exports.Demo = { templateId: 'Demo:Demo:Demo' };
       const indexDts = readFileSync(join(root, 'lib/index.d.ts'), 'utf8');
       expect(indexDts).toContain('export { Demo, DA }');
       expect(indexDts).toContain('DEMO_TEMPLATES');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('does not rewrite failed postBundlePresets onto missing __bundled__ paths', (): void => {
+    const root = scaffoldRepo();
+    try {
+      scaffoldDependencyTemplates(root);
+      // Remove DA Time Types so postBundlePresets apply fails.
+      rmSync(join(root, 'generated', 'js', 'daml-stdlib-DA-Time-Types-1.0.0'), {
+        recursive: true,
+        force: true,
+      });
+      const pkgDir = scaffoldGeneratedPackage(root);
+      // Bundle only the template preset into the source package.
+      bundleDependenciesForTarget({
+        targetDir: pkgDir,
+        generatedJsDir: join(root, 'generated', 'js'),
+        pins: { amulet: '0.1.19', tokenStandardUtils: '2.0.0' },
+        presets: ['da-internal-template'],
+      });
+
+      writeFileSync(
+        join(root, 'daml-js-bundle.json'),
+        JSON.stringify(
+          {
+            presets: ['da-internal-template'],
+            rootIndex: {
+              sourcePackage: { namePrefix: 'Demo' },
+              copy: ['Demo', 'DA', '__bundled__'],
+              namespaces: ['Demo', 'DA'],
+              postBundlePresets: ['da-time-types'],
+            },
+          },
+          null,
+          2
+        )
+      );
+
+      createRootIndex({ rootDir: root });
+
+      expect(existsSync(join(root, 'lib/__bundled__/daml-stdlib-DA-Time-Types'))).toBe(false);
+      const demoJs = readFileSync(join(root, 'lib/Demo/module.js'), 'utf8');
+      // Failed postBundlePreset must leave the original import intact.
+      expect(demoJs).toContain("require('daml.js/daml-stdlib-DA-Time-Types-1.0.0')");
+      expect(demoJs).not.toContain('__bundled__/daml-stdlib-DA-Time-Types');
+      // Previously bundled + copied preset may still be rewritten.
+      expect(demoJs).toContain('__bundled__/ghc-stdlib-DA-Internal-Template');
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

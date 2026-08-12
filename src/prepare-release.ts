@@ -131,7 +131,8 @@ function getNpmMetadataFromNpmView(packageName: string): NpmLookupResult {
       }).trim();
       latest = latestRaw || null;
     } catch {
-      latest = versions.size > 0 ? [...versions].sort().at(-1) ?? null : null;
+      // Semver compare — lexicographic sort ranks "0.9.0" above "0.10.0".
+      latest = pickLatestSemver(versions);
     }
 
     return { kind: 'found', latest, versions };
@@ -194,10 +195,28 @@ export function parseVersion(version: string): ParsedVersion | null {
 }
 
 /** Compare two parsed semantic versions. */
-function compareVersions(left: ParsedVersion, right: ParsedVersion): number {
+export function compareVersions(left: ParsedVersion, right: ParsedVersion): number {
   if (left.major !== right.major) return left.major - right.major;
   if (left.minor !== right.minor) return left.minor - right.minor;
   return left.patch - right.patch;
+}
+
+/**
+ * Pick the highest exact `x.y.z` from a versions list (semver, not lexicographic).
+ * Non-exact versions are ignored. Returns null when none parse.
+ */
+export function pickLatestSemver(versions: Iterable<string>): string | null {
+  let best: ParsedVersion | null = null;
+  let bestRaw: string | null = null;
+  for (const version of versions) {
+    const parsed = parseVersion(version);
+    if (!parsed) continue;
+    if (!best || compareVersions(parsed, best) > 0) {
+      best = parsed;
+      bestRaw = version;
+    }
+  }
+  return bestRaw;
 }
 
 /** Find the next available version by incrementing patch until free on tags and npm */
