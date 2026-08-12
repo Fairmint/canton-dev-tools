@@ -92,9 +92,17 @@ export function runCodegenJs(options: CodegenJsOptions): CodegenJsResult {
   }
 
   const suffixes = readCodegenPublishSuffixes(rootDir);
-  const updateTargets = packages
-    .filter((pkg) => fs.existsSync(path.join(pkg.absoluteGeneratedJsDir, 'package.json')))
-    .map((pkg) => ({
+  const updateTargets = packages.map((pkg) => {
+    const generatedPackageJson = path.join(pkg.absoluteGeneratedJsDir, 'package.json');
+    if (!fs.existsSync(generatedPackageJson)) {
+      throw new Error(
+        `Missing generated package.json for ${pkg.name} at ${generatedPackageJson}` +
+          (options.skipDpm
+            ? ' (--skip-dpm requires prior dpm codegen-js output for every discovered package).'
+            : '.')
+      );
+    }
+    return {
       dir: pkg.absoluteGeneratedJsDir,
       publishedPackageName: resolvePublishedPackageName({
         rootPackageName: rootPackage.name!,
@@ -102,7 +110,8 @@ export function runCodegenJs(options: CodegenJsOptions): CodegenJsResult {
         suffixes,
         codegenPackageCount: packages.length,
       }),
-    }));
+    };
+  });
 
   const updatedDirs = updateGeneratedPackagesFromRoot({
     rootDir,

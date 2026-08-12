@@ -16,4 +16,9 @@ if (require.main === module) {
   }
 }
 
-export { prepareRelease, selectReleaseVersion } from '../src/prepare-release';
+export {
+  parseChangelogRepo,
+  parseVersion,
+  prepareRelease,
+  selectReleaseVersion,
+} from '../src/prepare-release';

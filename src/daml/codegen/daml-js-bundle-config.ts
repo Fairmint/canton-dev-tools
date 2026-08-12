@@ -45,7 +45,11 @@ export interface RootIndexSourcePackage {
 }
 
 export interface RootIndexConfig {
-  /** Output directory relative to repo root (default `lib`). */
+  /**
+   * Output directory relative to repo root (default `lib`).
+   * Must be a safe relative path whose basename is `lib` — bundle presets and
+   * import rewrites assume a `<packageRoot>/lib` layout.
+   */
   outputDir?: string;
   /** Which codegen package supplies the primary tree. */
   sourcePackage: RootIndexSourcePackage;
@@ -204,6 +208,11 @@ function parseRootIndex(raw: unknown, label: string): RootIndexConfig {
   if (!Array.isArray(copyRaw) || copyRaw.length === 0 || !copyRaw.every((v) => typeof v === 'string')) {
     throw new Error(`Invalid ${label}.copy (expected non-empty string[])`);
   }
+  const copy = (copyRaw as string[]).map((entry, index) => {
+    assertSafeRelativePath(entry, `${label}.copy[${index}]`);
+    return normalizeRelativePath(entry);
+  });
+
   const namespacesRaw = raw['namespaces'];
   if (
     !Array.isArray(namespacesRaw) ||
@@ -213,9 +222,21 @@ function parseRootIndex(raw: unknown, label: string): RootIndexConfig {
     throw new Error(`Invalid ${label}.namespaces (expected non-empty string[])`);
   }
 
-  const outputDir = raw['outputDir'];
-  if (outputDir !== undefined && (typeof outputDir !== 'string' || outputDir.length === 0)) {
-    throw new Error(`Invalid ${label}.outputDir`);
+  const outputDirRaw = raw['outputDir'];
+  let outputDir: string | undefined;
+  if (outputDirRaw !== undefined) {
+    if (typeof outputDirRaw !== 'string' || outputDirRaw.length === 0) {
+      throw new Error(`Invalid ${label}.outputDir`);
+    }
+    assertSafeRelativePath(outputDirRaw, `${label}.outputDir`);
+    outputDir = normalizeRelativePath(outputDirRaw);
+    // Bundle presets / import rewrites resolve targets under `<packageRoot>/lib/`.
+    if (path.basename(outputDir) !== 'lib') {
+      throw new Error(
+        `${label}.outputDir must resolve to a directory named "lib" ` +
+          `(got ${JSON.stringify(outputDirRaw)}). Custom non-lib output dirs are not supported.`
+      );
+    }
   }
 
   const postBundlePresetsRaw = raw['postBundlePresets'];
@@ -237,7 +258,7 @@ function parseRootIndex(raw: unknown, label: string): RootIndexConfig {
   return {
     ...(typeof outputDir === 'string' ? { outputDir } : {}),
     sourcePackage,
-    copy: copyRaw as string[],
+    copy,
     namespaces: namespacesRaw as string[],
     templateConstants: parseTemplateConstants(raw['templateConstants'], `${label}.templateConstants`),
     ...(postBundlePresets ? { postBundlePresets } : {}),

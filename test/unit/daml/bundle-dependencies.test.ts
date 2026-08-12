@@ -160,6 +160,64 @@ describe('daml-js-bundle config', (): void => {
     ).toThrow(/Invalid test.presets\[0\]/);
   });
 
+  it('rejects unsafe rootIndex.outputDir and copy paths', (): void => {
+    expect(() =>
+      parseDamlJsBundleConfig(
+        {
+          rootIndex: {
+            outputDir: '../outside',
+            sourcePackage: { namePrefix: 'Demo' },
+            copy: ['Demo'],
+            namespaces: ['Demo'],
+          },
+        },
+        'test'
+      )
+    ).toThrow(/Unsafe test\.rootIndex\.outputDir/);
+
+    expect(() =>
+      parseDamlJsBundleConfig(
+        {
+          rootIndex: {
+            outputDir: 'dist',
+            sourcePackage: { namePrefix: 'Demo' },
+            copy: ['Demo'],
+            namespaces: ['Demo'],
+          },
+        },
+        'test'
+      )
+    ).toThrow(/must resolve to a directory named "lib"/);
+
+    expect(() =>
+      parseDamlJsBundleConfig(
+        {
+          rootIndex: {
+            sourcePackage: { namePrefix: 'Demo' },
+            copy: ['../escape'],
+            namespaces: ['Demo'],
+          },
+        },
+        'test'
+      )
+    ).toThrow(/Unsafe test\.rootIndex\.copy\[0\]/);
+  });
+
+  it('accepts nested outputDir when basename is lib', (): void => {
+    const parsed = parseDamlJsBundleConfig(
+      {
+        rootIndex: {
+          outputDir: 'packages/demo/lib',
+          sourcePackage: { namePrefix: 'Demo' },
+          copy: ['Demo'],
+          namespaces: ['Demo'],
+        },
+      },
+      'test'
+    );
+    expect(parsed.rootIndex?.outputDir).toBe('packages/demo/lib');
+  });
+
   it('resolves daml-js-bundle.json with defaults', (): void => {
     const root = mkdtempSync(join(tmpdir(), 'bundle-config-'));
     try {

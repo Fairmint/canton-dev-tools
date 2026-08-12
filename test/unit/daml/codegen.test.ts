@@ -24,7 +24,7 @@ import {
   fixSpliceRefs,
   updateGeneratedPackages,
 } from '../../../src/daml/codegen';
-import { parseChangelogRepo, selectReleaseVersion } from '../../../src/prepare-release';
+import { parseChangelogRepo, parseVersion, selectReleaseVersion } from '../../../src/prepare-release';
 
 describe('collapseManifestLines', (): void => {
   it('drops map files and collapses js/d.ts pairs', (): void => {
@@ -37,6 +37,14 @@ describe('collapseManifestLines', (): void => {
         'README.md',
       ])
     ).toEqual(['README.md', 'lib/index']);
+  });
+
+  it('keeps extension when the js/d.ts counterpart is missing', (): void => {
+    expect(collapseManifestLines(['bin.js', 'lib/index.js', 'lib/index.d.ts'])).toEqual([
+      'bin.js',
+      'lib/index',
+    ]);
+    expect(collapseManifestLines(['types.d.ts', 'README.md'])).toEqual(['README.md', 'types.d.ts']);
   });
 
   it('throws when no files remain', (): void => {
@@ -86,6 +94,34 @@ describe('generated output helpers', (): void => {
         },
       ]);
       expect(readFileSync(join(dir, 'other.js'), 'utf8')).toContain('__bundled__');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('rewrites both single- and double-quoted generated imports', (): void => {
+    const dir = mkdtempSync(join(tmpdir(), 'codegen-quotes-'));
+    try {
+      writeGeneratedOutputPair(dir, 'quoted', {
+        js: 'require("daml.js/foo");\nrequire(\'daml.js/foo\');\n',
+        dts: 'export * from "daml.js/foo";\nexport * from \'daml.js/foo\';\n',
+      });
+      const target = join(dir, 'rel-target');
+      mkdirSync(target, { recursive: true });
+      applyGeneratedImportRewrites(dir, [
+        {
+          importPaths: ['daml.js/foo'],
+          resolveTarget: () => target,
+        },
+      ]);
+      const js = readFileSync(join(dir, 'quoted.js'), 'utf8');
+      const dts = readFileSync(join(dir, 'quoted.d.ts'), 'utf8');
+      expect(js).toContain('require("./rel-target")');
+      expect(js).toContain("require('./rel-target')");
+      expect(js).not.toContain('daml.js/foo');
+      expect(dts).toContain('from "./rel-target";');
+      expect(dts).toContain("from './rel-target';");
+      expect(dts).not.toContain('daml.js/foo');
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -218,9 +254,25 @@ describe('selectReleaseVersion / changelog repo', (): void => {
     expect(selectReleaseVersion('0.0.1', '0.0.0', withTakenVersions('0.0.0'))).toBe('0.0.1');
   });
 
+  it('rejects invalid exact semver strings before Number conversion', (): void => {
+    expect(parseVersion('1e2.0.0')).toBeNull();
+    expect(parseVersion('01.2.3')).toBeNull();
+    expect(parseVersion('1..2')).toBeNull();
+    expect(parseVersion('1.2')).toBeNull();
+    expect(parseVersion('1.2.3')).toEqual({ major: 1, minor: 2, patch: 3 });
+    expect(() => selectReleaseVersion('1e2.0.0', null, withTakenVersions())).toThrow(
+      /Invalid version format/
+    );
+  });
+
   it('parses changelog repo from package.json repository url', (): void => {
     expect(
       parseChangelogRepo({ type: 'git', url: 'git+https://github.com/Fairmint/canton-assets.git' })
     ).toBe('Fairmint/canton-assets');
+  });
+
+  it('keeps dots in the repository name before an optional .git suffix', (): void => {
+    expect(parseChangelogRepo('https://github.com/acme/sdk.js.git')).toBe('acme/sdk.js');
+    expect(parseChangelogRepo('git@github.com:acme/sdk.js.git')).toBe('acme/sdk.js');
   });
 });

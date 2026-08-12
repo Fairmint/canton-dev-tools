@@ -22,8 +22,23 @@ export function collapseManifestLines(lines: readonly string[]): string[] {
   }
 
   for (const file of filesToKeep) {
-    if (file.endsWith('.d.ts') || file.endsWith('.js')) {
-      collapsedFiles.add(file.replace(/\.(d\.ts|js)$/, ''));
+    if (file.endsWith('.d.ts')) {
+      const base = file.slice(0, -'.d.ts'.length);
+      const jsCounterpart = `${base}.js`;
+      // Only collapse when the matching .js / .d.ts pair both exist.
+      if (filesToKeep.has(jsCounterpart)) {
+        collapsedFiles.add(base);
+      } else {
+        collapsedFiles.add(file);
+      }
+    } else if (file.endsWith('.js')) {
+      const base = file.slice(0, -'.js'.length);
+      const dtsCounterpart = `${base}.d.ts`;
+      if (filesToKeep.has(dtsCounterpart)) {
+        collapsedFiles.add(base);
+      } else {
+        collapsedFiles.add(file);
+      }
     } else {
       collapsedFiles.add(file);
     }

@@ -56,13 +56,17 @@ function replaceImportPath(
   isDts: boolean
 ): string {
   const escapedImportPath = escapeRegExp(importPath);
+  // Preserve whichever quote style the generated import used.
   if (isDts) {
-    return source.replace(new RegExp(`from '${escapedImportPath}';`, 'g'), `from '${relativePath}';`);
+    return source.replace(
+      new RegExp(`from (['"])${escapedImportPath}\\1;`, 'g'),
+      `from $1${relativePath}$1;`
+    );
   }
 
   return source.replace(
-    new RegExp(`require\\('${escapedImportPath}'\\)`, 'g'),
-    `require('${relativePath}')`
+    new RegExp(`require\\((['"])${escapedImportPath}\\1\\)`, 'g'),
+    `require($1${relativePath}$1)`
   );
 }
 

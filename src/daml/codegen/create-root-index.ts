@@ -8,6 +8,11 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { parseFlagValue } from '../packages';
+import {
+  assertSafeRelativePath,
+  normalizeRelativePath,
+  resolveContainedPath,
+} from '../sync-splice-dars';
 import { getErrorMessage } from '../types';
 import { applyBundlePresets } from './bundle-dependencies';
 import {
@@ -166,6 +171,9 @@ ${dtsConstants.declarations.join('\n')}
 /**
  * Patch daml.js / @fairmint / @daml.js imports onto `__bundled__` wrappers
  * using the same rewrite rules as bundle-dependencies.
+ *
+ * `destLib` must be a directory named `lib`: preset rewrite rules resolve
+ * targets under `<packageRoot>/lib/…`, so the package root is `dirname(destLib)`.
  */
 export function patchBundledDependencyImports(
   destLib: string,
@@ -175,8 +183,12 @@ export function patchBundledDependencyImports(
     presets: BundlePresetId[];
   }
 ): number {
-  // Rewrite rules are resolved relative to a package root with lib/ child.
-  // destLib is the lib directory itself, so the synthetic package root is its parent.
+  if (path.basename(destLib) !== 'lib') {
+    throw new Error(
+      `patchBundledDependencyImports expects a directory named "lib" (got ${destLib}). ` +
+        'Bundle rewrite rules resolve targets under <packageRoot>/lib/.'
+    );
+  }
   const packageRoot = path.dirname(destLib);
   const rules = options.presets.flatMap((id) =>
     BUNDLE_PRESETS[id].rewriteRules(packageRoot, options.pins)
@@ -216,25 +228,37 @@ export function createRootIndex(options: CreateRootIndexOptions): {
     );
   }
 
-  const outputRel = rootIndex.outputDir ?? 'lib';
-  const destLib = path.join(config.rootDir, outputRel);
+  const outputRel = normalizeRelativePath(rootIndex.outputDir ?? 'lib');
+  assertSafeRelativePath(outputRel, 'rootIndex.outputDir');
+  if (path.basename(outputRel) !== 'lib') {
+    throw new Error(
+      `rootIndex.outputDir must resolve to a directory named "lib" (got ${JSON.stringify(outputRel)}). ` +
+        'Bundle presets and import rewrites assume a <packageRoot>/lib layout.'
+    );
+  }
+  const destLib = resolveContainedPath(config.rootDir, outputRel, 'rootIndex.outputDir');
+  const packageRoot = path.dirname(destLib);
+
   console.log(`🧩 Building combined ${outputRel}/ from ${sourcePackage.name} codegen...`);
   removeDirectoryIfExists(destLib);
   createDirectoryIfNotExists(destLib);
 
-  for (const entry of rootIndex.copy) {
-    copyDirectory(path.join(pkgLib, entry), path.join(destLib, entry));
+  for (const [index, entry] of rootIndex.copy.entries()) {
+    assertSafeRelativePath(entry, `rootIndex.copy[${index}]`);
+    const normalizedEntry = normalizeRelativePath(entry);
+    copyDirectory(
+      resolveContainedPath(pkgLib, normalizedEntry, `rootIndex.copy[${index}]`),
+      resolveContainedPath(destLib, normalizedEntry, `rootIndex.copy[${index}]`)
+    );
   }
 
   writeRootIndexFiles(destLib, rootIndex.namespaces, rootIndex.templateConstants);
 
   const postPresets = rootIndex.postBundlePresets ?? [];
   if (postPresets.length > 0) {
-    // Preset apply paths assume targetDir/lib/… — use repo root when outputDir is `lib`.
-    const packageRootForPresets =
-      path.basename(destLib) === 'lib' ? path.dirname(destLib) : destLib;
+    // Preset apply paths assume targetDir/lib/…; packageRoot is dirname(destLib).
     applyBundlePresets({
-      targetDir: packageRootForPresets,
+      targetDir: packageRoot,
       generatedJsDir: config.absoluteGeneratedJsDir,
       pins: config.pins,
       presets: postPresets,
@@ -250,10 +274,8 @@ export function createRootIndex(options: CreateRootIndexOptions): {
     });
   }
 
-  const packageRootForIndexes =
-    path.basename(destLib) === 'lib' ? path.dirname(destLib) : destLib;
-  ensureBundledDANamespaceIndexes(packageRootForIndexes);
-  ensureBundledSpliceNamespaceIndexes(packageRootForIndexes);
+  ensureBundledDANamespaceIndexes(packageRoot);
+  ensureBundledSpliceNamespaceIndexes(packageRoot);
 
   console.log(`✅ Combined ${outputRel}/ created`);
   return { config, sourcePackage, outputDir: destLib };

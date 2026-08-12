@@ -12,7 +12,7 @@
  * Rewrites package.json version in the CI workspace only — does not commit it back.
  */
 
-import { execSync } from 'node:child_process';
+import { execFileSync, execSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { parseFlagValue } from './daml/packages';
@@ -34,10 +34,24 @@ export interface PrepareReleaseOptions {
   changelogRepo?: string;
 }
 
+/** Exact `x.y.z` with no leading zeros, exponents, or empty segments. */
+const STRICT_SEMVER_PATTERN = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
+
+/** Release tags created by this workflow: `v` + exact semver. */
+const RELEASE_TAG_GLOB = 'v[0-9]*.[0-9]*.[0-9]*';
+
+type NpmLookupResult =
+  | { kind: 'found'; latest: string | null; versions: Set<string> }
+  | { kind: 'not-found' }
+  | { kind: 'error'; message: string };
+
 /** Check if a git tag exists */
 function tagExists(rootDir: string, tag: string): boolean {
   try {
-    execSync(`git rev-parse "refs/tags/${tag}"`, { cwd: rootDir, stdio: 'ignore' });
+    execFileSync('git', ['rev-parse', `refs/tags/${tag}`], {
+      cwd: rootDir,
+      stdio: 'ignore',
+    });
     return true;
   } catch {
     return false;
@@ -49,70 +63,132 @@ function encodePackageNameForRegistry(packageName: string): string {
   return packageName.replace('/', '%2f');
 }
 
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return String(error);
+}
+
 /**
  * Read published versions from the public registry HTTP API.
  *
  * Prefer this over `npm view` when a classic auth token in npmrc can 404 public
  * packages the token cannot read (npm reports that as 404, not 403).
  */
-function getNpmMetadataFromRegistry(packageName: string): {
-  latest: string | null;
-  versions: Set<string>;
-} | null {
+export function getNpmMetadataFromRegistry(packageName: string): NpmLookupResult {
   try {
     const encodedName = encodePackageNameForRegistry(packageName);
-    const result = execSync(`curl -fsS "https://registry.npmjs.org/${encodedName}"`, {
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'pipe'],
-    }).trim();
-    const metadata = JSON.parse(result) as {
+    const result = execFileSync(
+      'curl',
+      ['-sS', '-w', '\n%{http_code}', `https://registry.npmjs.org/${encodedName}`],
+      {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+      }
+    );
+    const trimmed = result.replace(/\s+$/, '');
+    const lastNewline = trimmed.lastIndexOf('\n');
+    const body = lastNewline === -1 ? '' : trimmed.slice(0, lastNewline);
+    const statusCode = lastNewline === -1 ? trimmed : trimmed.slice(lastNewline + 1);
+
+    if (statusCode === '404') {
+      return { kind: 'not-found' };
+    }
+    if (statusCode !== '200') {
+      return { kind: 'error', message: `registry.npmjs.org returned HTTP ${statusCode}` };
+    }
+
+    const metadata = JSON.parse(body) as {
       'dist-tags'?: { latest?: string };
       versions?: Record<string, unknown>;
     };
     const versions = new Set(Object.keys(metadata.versions ?? {}));
     const latest = metadata['dist-tags']?.latest ?? null;
-    return { latest, versions };
-  } catch {
-    return null;
+    return { kind: 'found', latest, versions };
+  } catch (error) {
+    return { kind: 'error', message: getErrorMessage(error) };
   }
 }
 
-/** Get all published versions from NPM registry */
-function getAllNpmVersions(packageName: string): Set<string> {
+function isNpmNotFoundMessage(message: string): boolean {
+  return /\b404\b|E404|Not Found|not found/i.test(message);
+}
+
+/** Get published versions via `npm view` (fallback when registry HTTP fails transiently). */
+function getNpmMetadataFromNpmView(packageName: string): NpmLookupResult {
   try {
-    const result = execSync(`npm view "${packageName}" versions --json`, {
+    const versionsRaw = execSync(`npm view "${packageName}" versions --json`, {
       encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
     }).trim();
-    const versions = JSON.parse(result) as string | string[];
-    if (Array.isArray(versions)) {
-      return new Set(versions);
+    const parsed = JSON.parse(versionsRaw) as string | string[];
+    const versions = new Set(Array.isArray(parsed) ? parsed : [parsed]);
+
+    let latest: string | null = null;
+    try {
+      const latestRaw = execSync(`npm view "${packageName}" version`, {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+      }).trim();
+      latest = latestRaw || null;
+    } catch {
+      latest = versions.size > 0 ? [...versions].sort().at(-1) ?? null : null;
     }
-    return new Set([versions]);
-  } catch {
-    return new Set();
+
+    return { kind: 'found', latest, versions };
+  } catch (error) {
+    const message = getErrorMessage(error);
+    if (isNpmNotFoundMessage(message)) {
+      return { kind: 'not-found' };
+    }
+    return { kind: 'error', message };
   }
 }
 
-/** Get the latest version from NPM registry */
-function getLatestNpmVersion(packageName: string): string | null {
-  try {
-    const result = execSync(`npm view "${packageName}" version`, { encoding: 'utf8' }).trim();
-    return result || null;
-  } catch {
-    return null;
+/**
+ * Establish published-version state, failing closed when unknown.
+ *
+ * Registry HTTP 404 → treat as unpublished (new package).
+ * Registry HTTP success → use that metadata.
+ * Registry transient error → only accept a successful `npm view`; never treat
+ * ambiguous failures as "no versions published".
+ */
+export function resolvePublishedNpmState(packageName: string): {
+  latest: string | null;
+  versions: Set<string>;
+} {
+  const registry = getNpmMetadataFromRegistry(packageName);
+  if (registry.kind === 'found') {
+    return { latest: registry.latest, versions: registry.versions };
   }
+  if (registry.kind === 'not-found') {
+    return { latest: null, versions: new Set() };
+  }
+
+  const npmView = getNpmMetadataFromNpmView(packageName);
+  if (npmView.kind === 'found') {
+    console.log(
+      `registry.npmjs.org unavailable (${registry.message}); using npm view metadata instead`
+    );
+    return { latest: npmView.latest, versions: npmView.versions };
+  }
+
+  throw new Error(
+    `Unable to determine published versions for ${packageName} (failing closed). ` +
+      `registry: ${registry.message}; npm view: ${npmView.message}`
+  );
 }
 
-/** Parse version string into components */
-function parseVersion(version: string): ParsedVersion | null {
-  const parts = version.split('.').map(Number);
-  if (parts.length !== 3 || parts.some(isNaN)) {
+/** Parse version string into components (exact `x.y.z` only). */
+export function parseVersion(version: string): ParsedVersion | null {
+  const match = STRICT_SEMVER_PATTERN.exec(version);
+  if (!match) {
     return null;
   }
-  if (!parts.every((part) => Number.isInteger(part) && part >= 0)) {
-    return null;
-  }
-  return { major: parts[0]!, minor: parts[1]!, patch: parts[2]! };
+  return {
+    major: Number(match[1]),
+    minor: Number(match[2]),
+    patch: Number(match[3]),
+  };
 }
 
 /** Compare two parsed semantic versions. */
@@ -158,6 +234,10 @@ export function selectReleaseVersion(
   }
 
   const npmParsed = latestNpmVersion ? parseVersion(latestNpmVersion) : null;
+  if (latestNpmVersion && !npmParsed) {
+    throw new Error(`Invalid version from npm: ${latestNpmVersion}. Expected format: x.y.z`);
+  }
+
   const manifestAheadOfNpm = !npmParsed || compareVersions(manifestParsed, npmParsed) > 0;
 
   if (manifestAheadOfNpm && !isVersionTaken(manifestVersion)) {
@@ -177,8 +257,12 @@ export function parseChangelogRepo(
   const url = typeof repository === 'string' ? repository : repository.url;
   if (!url) return undefined;
 
-  const match = url.match(/github\.com[/:]([^/]+\/[^/.]+)(?:\.git)?/i);
-  return match?.[1];
+  // Capture owner/repo (dots allowed); strip only a trailing `.git` suffix.
+  const match = url.match(/github\.com[/:]([^/]+\/[^/#?\s]+)/i);
+  if (!match?.[1]) {
+    return undefined;
+  }
+  return match[1].replace(/\.git$/i, '');
 }
 
 export function resolveChangelogRepo(
@@ -187,6 +271,40 @@ export function resolveChangelogRepo(
 ): string | undefined {
   if (explicit) return explicit;
   return parseChangelogRepo(packageJson.repository);
+}
+
+/** Describe the nearest prior `v<semver>` release tag, or null if none. */
+function describePreviousReleaseTag(rootDir: string): string | null {
+  try {
+    const lastTag = execFileSync(
+      'git',
+      ['describe', '--tags', '--abbrev=0', '--match', RELEASE_TAG_GLOB],
+      {
+        cwd: rootDir,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      }
+    ).trim();
+    return lastTag || null;
+  } catch {
+    return null;
+  }
+}
+
+function readCommitsSince(rootDir: string, lastTag: string | null): string {
+  if (lastTag) {
+    return execFileSync('git', ['log', '--oneline', '--format=%s', `${lastTag}..HEAD`], {
+      cwd: rootDir,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    }).trim();
+  }
+
+  return execFileSync('git', ['log', '--oneline', '--format=%s', '-n', '20'], {
+    cwd: rootDir,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  }).trim();
 }
 
 /**
@@ -208,23 +326,13 @@ export function prepareRelease(options: PrepareReleaseOptions): string {
   console.log(`Current version in package.json: ${currentVersion}`);
 
   console.log('Fetching published versions from NPM...');
-  let npmVersions = getAllNpmVersions(packageName);
-  let latestNpmVersion = getLatestNpmVersion(packageName);
-
-  if (!latestNpmVersion && npmVersions.size === 0) {
-    const registryMetadata = getNpmMetadataFromRegistry(packageName);
-    if (registryMetadata) {
-      console.log('npm view returned no versions; using public registry HTTP metadata instead');
-      npmVersions = registryMetadata.versions;
-      latestNpmVersion = registryMetadata.latest;
-    }
-  }
+  const { versions: npmVersions, latest: latestNpmVersion } = resolvePublishedNpmState(packageName);
 
   if (latestNpmVersion) {
     console.log(`Latest version on NPM: ${latestNpmVersion}`);
     console.log(`Total published versions: ${npmVersions.size}`);
   } else {
-    console.log('No version found on NPM (new package or registry unavailable)');
+    console.log('No version found on NPM (new package)');
   }
 
   const isVersionTaken = (version: string): boolean =>
@@ -238,24 +346,18 @@ export function prepareRelease(options: PrepareReleaseOptions): string {
 
   console.log('✅ Updated package.json with new version');
 
-  let commits: string;
-  let lastTag: string | null = null;
-  try {
-    lastTag = execSync('git describe --tags --abbrev=0 2>/dev/null', {
-      cwd: rootDir,
-      encoding: 'utf8',
-    }).trim();
+  const lastTag = describePreviousReleaseTag(rootDir);
+  if (lastTag) {
     console.log(`Last tag: ${lastTag}`);
-    commits = execSync(`git log --oneline --format="%s" ${lastTag}..HEAD`, {
-      cwd: rootDir,
-      encoding: 'utf8',
-    }).trim();
+  } else {
+    console.log('No previous release tag found, using recent commit history');
+  }
+
+  let commits: string;
+  try {
+    commits = readCommitsSince(rootDir, lastTag);
   } catch {
-    console.log('No previous tag found, using recent commit history');
-    commits = execSync('git log --oneline --format="%s" -n 20', {
-      cwd: rootDir,
-      encoding: 'utf8',
-    }).trim();
+    commits = '';
   }
 
   if (!commits) {
