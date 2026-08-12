@@ -41,9 +41,67 @@ npx canton-dev-tools check-dar-version-policy --all
 npx canton-dev-tools check-dar-version-policy --extra-policy-paths scripts/codegen,libs/splice
 npx canton-dev-tools check-upgrade-compat
 npx canton-dev-tools sync-splice-dars
+npx canton-dev-tools codegen-js
+npx canton-dev-tools prepare-release --changelog-repo Fairmint/canton-assets
 ```
 
 `backup-dar` / version-policy / upgrade-compat skip `Test` packages by default. Pass `--package` with the daml.yaml name, source dir, or a fuzzy alias (e.g. `wrappedAssets`).
+
+### `codegen-js` (Phase 1)
+
+Generic DAML → JS bindings steps for packages that declare `codegen.js` in `daml.yaml`:
+
+1. `dpm codegen-js` in each `generated/build/<pkg>` (expects `prepare-build` already done)
+2. Stamp generated `package.json` name/version from the repo root
+3. Write per-package `index.js` / `index.d.ts`
+4. Fix Splice namespace refs on generated `lib/` trees (optional `@fairmint/*` → `__bundled__` rewrite when present)
+
+**Still consumer-local (Phase 2):** `bundle-dependencies`, `create-root-index`, merged-lib verify lists.
+
+Optional publish suffixes in root `package.json` (multi-package repos):
+
+```json
+{
+  "cantonDevTools": {
+    "codegenPublishSuffixes": {
+      "OpenCapTableReports-v01": "reports",
+      "WrappedAssets-v01": null
+    }
+  }
+}
+```
+
+`null` publishes as the root package name. A single codegen package defaults to the root name.
+
+Library imports:
+
+```ts
+import {
+  runCodegenJs,
+  createPackageIndexes,
+  updateGeneratedPackagesFromRoot,
+  fixSpliceRefs,
+  collapseManifestLines,
+  verifyPackageImports,
+  applyGeneratedImportRewrites,
+} from '@fairmint/canton-dev-tools/daml';
+```
+
+Example consumer scripts:
+
+```json
+{
+  "scripts": {
+    "prepare-build": "canton-dev-tools prepare-build",
+    "codegen": "npm run build && canton-dev-tools codegen-js",
+    "prepare-release": "canton-dev-tools prepare-release",
+    "package:manifest": "… | canton-dev-tools collapse-manifest > generated/npm-manifest.txt",
+    "package:prep": "npm run codegen && npm run update-version && tsx scripts/bundle-dependencies.ts && tsx scripts/create-root-index.ts && tsx scripts/fix-splice-refs.ts"
+  }
+}
+```
+
+Prefer calling library helpers from thin consumer scripts when you need a custom step order (assets: bundle → create-root-index → fix-splice-refs on merged `lib/`).
 
 ### `check-dar-version-policy` extra watch paths
 
@@ -97,7 +155,7 @@ Optional overrides, in order:
 ### Library import
 
 ```ts
-import { prepareBuild, discoverManagedPackages } from '@fairmint/canton-dev-tools/daml';
+import { prepareBuild, discoverManagedPackages, runCodegenJs } from '@fairmint/canton-dev-tools/daml';
 ```
 
 ## TypeScript helpers

@@ -18,3 +18,17 @@ export type ContractNetwork = 'mainnet' | 'devnet';
 export function isContractNetwork(value: string): value is ContractNetwork {
   return value === 'mainnet' || value === 'devnet';
 }
+
+/** Minimal package.json shape used by codegen / release helpers. */
+export interface PackageJson {
+  name?: string;
+  version?: string;
+  private?: boolean;
+  dependencies?: Record<string, string>;
+  devDependencies?: Record<string, string>;
+  peerDependencies?: Record<string, string>;
+  'peer-dependencies'?: Record<string, string>;
+  publishConfig?: { access?: string };
+  repository?: string | { type?: string; url?: string };
+  [key: string]: unknown;
+}

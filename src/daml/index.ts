@@ -10,3 +10,4 @@ export * from './backup-dar';
 export * from './check-dar-version-policy';
 export * from './check-upgrade-compatibility';
 export * from './sync-splice-dars';
+export * from './codegen';
