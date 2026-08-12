@@ -81,7 +81,7 @@
     "@fairmint/canton-node-sdk": ">=0.0.232 <0.1.0"
   },
   "devDependencies": {
-    "@fairmint/canton-node-sdk": "0.0.251",
+    "@fairmint/canton-node-sdk": "0.0.253",
     "@types/jest": "30.0.0",
     "@types/node": "22.15.29",
     "@typescript-eslint/eslint-plugin": "8.62.1",
