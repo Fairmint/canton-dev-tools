@@ -1,8 +1,8 @@
 # @fairmint/canton-dev-tools
 
-Shared Canton LocalNet CLI, DAML package tooling, and integration-test helpers for Fairmint packages.
+Shared Canton LocalNet CLI, DAML package tooling, and integration-test helpers for Canton LocalNet consumers.
 
-This package owns the versioned LocalNet lifecycle (start, readiness, diagnostics, teardown), reusable TypeScript helpers used by Canton integration tests, and shared DAML multi-package scripts (prepare-build, DAR policy, Splice DAR sync). Introduced by [ENG-1635](https://linear.app/fairmint/issue/ENG-1635/establish-canton-dev-tools-and-migrate-shared-canton-test).
+This package owns the versioned LocalNet lifecycle (start, readiness, diagnostics, teardown), reusable TypeScript helpers used by Canton integration tests, and shared DAML multi-package scripts (prepare-build, DAR policy, Splice DAR sync). Introduced to own the shared LocalNet lifecycle.
 
 ## Docs
 
@@ -15,8 +15,6 @@ Canonical documentation lives in this repository:
 
 Implementation: [`bin/canton-dev-tools`](./bin/canton-dev-tools) and [`scripts/localnet-cloud.sh`](./scripts/localnet-cloud.sh). CI smoke: [`.github/workflows/localnet-smoke.yml`](./.github/workflows/localnet-smoke.yml).
 
-_Fairmint-internal cross-repo CI notes (non-canonical): [dev-docs canton-localnet](https://github.com/Fairmint/dev-docs/blob/main/docs/development/testing/canton-localnet.md)._
-
 ## Install
 
 ```bash
@@ -27,7 +25,7 @@ Peer dependency: `@fairmint/canton-node-sdk` (for TypeScript helpers).
 
 ## LocalNet
 
-`@fairmint/canton-dev-tools` owns Fairmint's shared Canton LocalNet lifecycle. The CLI wraps [Canton Network Quickstart](https://docs.canton.network/appdev/quickstart) with pinned versions from [COMPATIBILITY.md](./COMPATIBILITY.md).
+This package owns the shared Canton LocalNet lifecycle. The CLI wraps [Canton Network Quickstart](https://docs.canton.network/appdev/quickstart) with pinned versions from [COMPATIBILITY.md](./COMPATIBILITY.md).
 
 ### Prerequisites
 
