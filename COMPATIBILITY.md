@@ -1,6 +1,6 @@
 # LocalNet Compatibility Pins
 
-`@fairmint/canton-dev-tools` is the **central owner** of Fairmint's shared Canton LocalNet pin set.
+`@fairmint/canton-dev-tools` is the **central owner** of the shared Canton LocalNet pin set.
 
 For CLI usage, prerequisites, consumer wiring, and ready endpoints, see the [README LocalNet section](./README.md#localnet).
 
@@ -52,6 +52,6 @@ These remain supported for one-off local experiments:
 - `CANTON_LOCALNET_AUTH_MODE`
 - `CANTON_LOCALNET_INFRA_ONLY`
 
-Changing the default pins is a breaking compatibility change for shared LocalNet CI and should be reviewed as part of ENG-1635 follow-ups.
+Changing the default pins is a breaking compatibility change for shared LocalNet CI and should be reviewed with downstream consumers.
 
-SDK package-boundary ownership (what ships in publish tarballs vs CI-only fixtures) is tracked via consumer PRs under [ENG-1635](https://linear.app/fairmint/issue/ENG-1635/establish-canton-dev-tools-and-migrate-shared-canton-test).
+SDK package-boundary ownership (what ships in publish tarballs vs CI-only fixtures) is tracked via consumer package updates.
