@@ -376,11 +376,11 @@ export async function runCip56TransferSmoke(
   ledger.setPartyId(adminPartyId);
 
   // 5. TokenRules
-  const createTree = await ledger.submitAndWaitForTransactionTree({
+  const createTx = await ledger.submitAndWaitForTransaction({
     actAs: [adminPartyId],
     commands: [toCreateCommand(buildTokenRulesCreateCommand({ admin: adminPartyId }))],
   });
-  const tokenRulesContractId = findCreatedContractId(createTree, 'TokenRules');
+  const tokenRulesContractId = findCreatedContractId(createTx, 'TokenRules');
   const tokenRulesEvents = await ledger.getEventsByContractId({
     contractId: tokenRulesContractId,
     readAs: [adminPartyId],
@@ -405,7 +405,7 @@ export async function runCip56TransferSmoke(
   // 6. mint — OfferMint (admin) then Accept (alice)
   // offeredAt must be <= ledger time (assertDeadlineExceeded).
   const offeredAt = new Date(Date.now() - 60_000).toISOString();
-  const offerMintTree = await ledger.submitAndWaitForTransactionTree({
+  const offerMintTx = await ledger.submitAndWaitForTransaction({
     actAs: [adminPartyId],
     commands: [
       toExerciseCommand(
@@ -421,14 +421,14 @@ export async function runCip56TransferSmoke(
   });
 
   const offerMintResult = findExerciseResult<{ offerCid?: string }>(
-    offerMintTree,
+    offerMintTx,
     'TokenRules_OfferMint'
   );
   const mintOfferContractId =
     (typeof offerMintResult?.offerCid === 'string' && offerMintResult.offerCid) ||
-    findCreatedContractId(offerMintTree, 'TokenTransferOffer');
+    findCreatedContractId(offerMintTx, 'TokenTransferOffer');
 
-  const mintAcceptTree = await ledger.submitAndWaitForTransactionTree({
+  const mintAcceptTx = await ledger.submitAndWaitForTransaction({
     actAs: [alicePartyId],
     disclosedContracts: [tokenRulesDisclosure],
     commands: [
@@ -442,7 +442,7 @@ export async function runCip56TransferSmoke(
     ],
   });
   const mintAcceptParsed = parseTransferInstructionResult(
-    findExerciseResult(mintAcceptTree, 'TransferInstruction_Accept')
+    findExerciseResult(mintAcceptTx, 'TransferInstruction_Accept')
   );
   if (mintAcceptParsed.type !== 'Completed') {
     throw new Error(
@@ -466,7 +466,7 @@ export async function runCip56TransferSmoke(
   // 7. transfer — TransferFactory_Transfer (alice) then Accept (bob)
   const requestedAt = new Date(Date.now() - 1_000).toISOString();
   const executeBefore = daysFromNowIso(7);
-  const transferTree = await ledger.submitAndWaitForTransactionTree({
+  const transferTx = await ledger.submitAndWaitForTransaction({
     actAs: [alicePartyId],
     disclosedContracts: [tokenRulesDisclosure],
     commands: [
@@ -487,7 +487,7 @@ export async function runCip56TransferSmoke(
     ],
   });
 
-  const transferExerciseResult = findExerciseResult(transferTree, 'TransferFactory_Transfer');
+  const transferExerciseResult = findExerciseResult(transferTx, 'TransferFactory_Transfer');
   const transferParsed = parseTransferInstructionResult(transferExerciseResult);
   if (transferParsed.type !== 'Pending' || !transferParsed.transferInstructionCid) {
     throw new Error(
@@ -506,7 +506,7 @@ export async function runCip56TransferSmoke(
     readAsParty: alicePartyId,
   });
 
-  const acceptTransferTree = await ledger.submitAndWaitForTransactionTree({
+  const acceptTransferTx = await ledger.submitAndWaitForTransaction({
     actAs: [bobPartyId],
     readAs: [alicePartyId, adminPartyId],
     disclosedContracts: [tokenRulesDisclosure, pendingDisclosure],
@@ -521,7 +521,7 @@ export async function runCip56TransferSmoke(
     ],
   });
   const bobAcceptParsed = parseTransferInstructionResult(
-    findExerciseResult(acceptTransferTree, 'TransferInstruction_Accept')
+    findExerciseResult(acceptTransferTx, 'TransferInstruction_Accept')
   );
   if (bobAcceptParsed.type !== 'Completed') {
     throw new Error(

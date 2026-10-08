@@ -45,25 +45,23 @@ describe('testing helpers', (): void => {
     expect(generateTestId('demo')).toMatch(/^demo-\d+-[a-z0-9]+$/);
   });
 
-  it('finds created contract ids from transaction trees', (): void => {
-    const tree = {
-      transactionTree: {
-        eventsById: {
-          '0': {
-            CreatedTreeEvent: {
-              value: {
-                contractId: 'cid-1',
-                templateId: '#Pkg:Mod:Holding',
-                createdEventBlob: 'blob',
-                createArgument: {},
-              },
+  it('finds created contract ids from transactions', (): void => {
+    const response = {
+      transaction: {
+        events: [
+          {
+            CreatedEvent: {
+              contractId: 'cid-1',
+              templateId: '#Pkg:Mod:Holding',
+              createdEventBlob: 'blob',
+              createArgument: {},
             },
           },
-        },
+        ],
       },
     };
 
-    expect(listCreatedEvents(tree)).toHaveLength(1);
-    expect(findCreatedContractId(tree, 'Holding')).toBe('cid-1');
+    expect(listCreatedEvents(response)).toHaveLength(1);
+    expect(findCreatedContractId(response, 'Holding')).toBe('cid-1');
   });
 });

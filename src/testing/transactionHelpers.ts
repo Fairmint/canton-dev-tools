@@ -1,5 +1,5 @@
 /**
- * Helpers for inspecting `submitAndWaitForTransactionTree` results in Canton integration tests.
+ * Helpers for inspecting `submitAndWaitForTransaction` results in Canton integration tests.
  */
 
 import {
@@ -9,22 +9,22 @@ import {
   type ParsedExercisedEvent,
 } from '@fairmint/canton-node-sdk';
 
-type CreatedTreeEventValue = Pick<
+type CreatedEventValue = Pick<
   ParsedCreatedEvent,
   'contractId' | 'templateId' | 'createdEventBlob' | 'createArgument'
 >;
-type ExercisedTreeEventValue = Pick<
+type ExercisedEventValue = Pick<
   ParsedExercisedEvent,
   'contractId' | 'templateId' | 'choice' | 'exerciseResult'
 >;
 
-/** Return all `CreatedTreeEvent` payloads in document order. */
-export function listCreatedEvents(input: unknown): CreatedTreeEventValue[] {
+/** Return all created-event payloads in document order. */
+export function listCreatedEvents(input: unknown): CreatedEventValue[] {
   return extractEventsFromTransaction(input).created;
 }
 
-/** Return all `ExercisedTreeEvent` payloads in document order. */
-export function listExercisedEvents(input: unknown): ExercisedTreeEventValue[] {
+/** Return all exercised-event payloads in document order. */
+export function listExercisedEvents(input: unknown): ExercisedEventValue[] {
   return extractEventsFromTransaction(input).exercised;
 }
 
@@ -40,7 +40,7 @@ export function findCreatedContractId(input: unknown, templateNameSubstring: str
     }
   }
   throw new Error(
-    `No CreatedTreeEvent with templateId containing "${templateNameSubstring}"; created templates: ` +
+    `No CreatedEvent with templateId containing "${templateNameSubstring}"; created templates: ` +
       `${listCreatedEvents(input)
         .map((c) => c.templateId)
         .join(', ')}`
@@ -66,7 +66,7 @@ export function findExerciseResult<T = unknown>(input: unknown, choiceName: stri
     }
   }
   throw new Error(
-    `No ExercisedTreeEvent with choice "${choiceName}"; exercised choices: ` +
+    `No ExercisedEvent with choice "${choiceName}"; exercised choices: ` +
       `${listExercisedEvents(input)
         .map((c) => c.choice)
         .join(', ')}`
