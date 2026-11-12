@@ -82,18 +82,18 @@
     "@fairmint/canton-node-sdk": ">=0.0.232 <0.1.0"
   },
   "devDependencies": {
-    "@fairmint/canton-node-sdk": "^0.0.266",
+    "@fairmint/canton-node-sdk": "^0.0.275",
     "@types/jest": "30.0.0",
-    "@types/node": "22.15.29",
-    "@typescript-eslint/eslint-plugin": "8.62.1",
-    "@typescript-eslint/parser": "8.62.1",
-    "eslint": "9.39.2",
+    "@types/node": "22.20.5",
+    "@typescript-eslint/eslint-plugin": "8.72.2",
+    "@typescript-eslint/parser": "8.72.2",
+    "eslint": "10.14.0",
     "eslint-plugin-unused-imports": "4.4.1",
-    "jest": "30.4.2",
-    "prettier": "3.8.4",
-    "ts-jest": "29.4.11",
-    "tsx": "4.23.0",
-    "typescript": "5.9.3"
+    "jest": "30.5.2",
+    "prettier": "3.10.0",
+    "ts-jest": "29.4.15",
+    "tsx": "4.23.15",
+    "typescript": "6.0.3"
   },
   "engines": {
     "node": ">=22"
@@ -102,6 +102,6 @@
     "access": "public"
   },
   "dependencies": {
-    "yaml": "2.9.0"
+    "yaml": "2.9.1"
   }
 }
