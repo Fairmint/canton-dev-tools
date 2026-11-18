@@ -171,3 +171,84 @@ start_localnet
     expect(output.trim().split('\n')).toEqual(['start-infra', 'wait', 'start-infra', 'wait']);
   });
 });
+
+describe('localnet-cloud profile setup', (): void => {
+  function runSetup(quickstart: string, env: Record<string, string>): string {
+    return execFileSync(
+      'bash',
+      [
+        '-c',
+        'source scripts/localnet-cloud.sh\n' +
+          'QUICKSTART_DIR="$1"\n' +
+          // Any Gradle or make call would hit public registries; fail loudly if one happens.
+          'make() { echo "unexpected make $*" >&2; return 99; }\n' +
+          'run_quickstart_setup',
+        'localnet-cloud-test',
+        quickstart,
+      ],
+      { cwd: REPO_ROOT, encoding: 'utf8', env: { PATH: process.env['PATH'] ?? '', ...env } }
+    );
+  }
+
+  it('writes the cn-quickstart profile keys without running make setup', (): void => {
+    const quickstart = mkdtempSync(resolve(tmpdir(), 'canton-localnet-setup-'));
+    try {
+      runSetup(quickstart, { CANTON_LOCALNET_AUTH_MODE: 'oauth2', USER: 'runner' });
+      const values = readFileSync(resolve(quickstart, '.env.local'), 'utf8')
+        .split('\n')
+        .filter((line) => line !== '');
+      expect(values).toEqual([
+        'OBSERVABILITY_ENABLED=true',
+        'AUTH_MODE=oauth2',
+        'PARTY_HINT=quickstart-runner-1',
+        'TEST_MODE=off',
+      ]);
+    } finally {
+      rmSync(quickstart, { recursive: true, force: true });
+    }
+  });
+
+  it('updates existing keys in place and keeps unrelated ones', (): void => {
+    const quickstart = mkdtempSync(resolve(tmpdir(), 'canton-localnet-setup-'));
+    const envFile = resolve(quickstart, '.env.local');
+    writeFileSync(envFile, 'SPLICE_VERSION=0.6.14\nAUTH_MODE=oauth2\nPARTY_HINT=old-hint-1\n');
+    try {
+      runSetup(quickstart, { CANTON_LOCALNET_AUTH_MODE: 'shared-secret', USER: 'ci-user.42' });
+      const values = readFileSync(envFile, 'utf8')
+        .split('\n')
+        .filter((line) => line !== '');
+      expect(values).toEqual([
+        'SPLICE_VERSION=0.6.14',
+        'AUTH_MODE=shared-secret',
+        'PARTY_HINT=quickstart-ciuser-1',
+        'OBSERVABILITY_ENABLED=true',
+        'TEST_MODE=off',
+      ]);
+    } finally {
+      rmSync(quickstart, { recursive: true, force: true });
+    }
+  });
+
+  it('falls back to a valid party hint when no user name is set', (): void => {
+    const quickstart = mkdtempSync(resolve(tmpdir(), 'canton-localnet-setup-'));
+    try {
+      runSetup(quickstart, { CANTON_LOCALNET_AUTH_MODE: 'oauth2' });
+      expect(readFileSync(resolve(quickstart, '.env.local'), 'utf8')).toContain(
+        'PARTY_HINT=quickstart-localnet-1'
+      );
+    } finally {
+      rmSync(quickstart, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects an unsupported auth mode', (): void => {
+    const quickstart = mkdtempSync(resolve(tmpdir(), 'canton-localnet-setup-'));
+    try {
+      expect(() =>
+        runSetup(quickstart, { CANTON_LOCALNET_AUTH_MODE: 'none', USER: 'runner' })
+      ).toThrow();
+    } finally {
+      rmSync(quickstart, { recursive: true, force: true });
+    }
+  });
+});

@@ -33,6 +33,8 @@ This package owns the shared Canton LocalNet lifecycle. The CLI wraps [Canton Ne
 - First start pulls images and bootstraps Splice (~10–15 minutes on a cold cache)
 - Host aliases `scan.localhost`, `sv.localhost`, and `wallet.localhost` (the CLI adds them with passwordless `sudo` when available; otherwise add manually)
 
+`start` writes cn-quickstart's `.env.local` profile itself (the same keys `make setup` would write) instead of running `make setup`, so the default infra-only start needs no Java or Gradle and downloads nothing from Gradle or Maven registries. Full (non-infra-only) starts still build cn-quickstart with Gradle.
+
 In npm consumer packages the CLI fetches [cn-quickstart](https://github.com/digital-asset/cn-quickstart) at the pinned ref into `~/.cache/fairmint/canton-localnet` (override with `CANTON_LOCALNET_CACHE_DIR` / `CANTON_LOCALNET_QUICKSTART_DIR`). In a git checkout with `libs/cn-quickstart`, submodule init is used instead.
 
 ### CLI

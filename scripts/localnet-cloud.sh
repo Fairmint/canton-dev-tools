@@ -570,36 +570,39 @@ current_auth_mode() {
   requested_auth_mode
 }
 
+quickstart_party_hint() {
+  local user="${USER:-${USERNAME:-}}"
+
+  # Same default as cn-quickstart's ConfigureProfilesTask: "quickstart-<letters of $USER>-1".
+  user="$(printf '%s' "${user}" | tr -cd 'A-Za-z')"
+  printf 'quickstart-%s-1' "${user:-localnet}"
+}
+
+# Writes the four profile keys that cn-quickstart's `make setup` (`./gradlew configureProfiles`)
+# would write, with the answers this script always gave it. `make setup` only edits .env.local,
+# but it has to download Gradle and resolve plugins from plugins.gradle.org / Maven Central first,
+# and those registries rate-limit shared CI runners (HTTP 429). Writing the file directly keeps
+# `start` free of public build registries.
 run_quickstart_setup() {
   local auth_mode=""
+  local env_file="${QUICKSTART_DIR}/.env.local"
 
   auth_mode="$(requested_auth_mode)"
   case "${auth_mode}" in
-    shared-secret)
-      log "Running cn-quickstart setup (shared-secret mode)..."
-      (
-        cd "${QUICKSTART_DIR}"
-        printf 'Y\nn\n\n' | make setup || true
-      )
-      verify_configured_auth_mode "shared-secret"
-      ;;
-    oauth2)
-      log "Running cn-quickstart setup (OAuth2 enabled)..."
-      (
-        cd "${QUICKSTART_DIR}"
-        # Match CI behavior first, then fall back to prompt-based answers for newer setup flows.
-        echo "2" | make setup || true
-        if [[ "$(configured_auth_mode)" != "oauth2" ]]; then
-          printf 'y\ny\n\nn\n' | make setup
-        fi
-      )
-      verify_configured_auth_mode "oauth2"
-      ;;
+    shared-secret | oauth2) ;;
     *)
       log "Unsupported CANTON_LOCALNET_AUTH_MODE: ${auth_mode}"
       exit 1
       ;;
   esac
+
+  log "Writing cn-quickstart profile config (AUTH_MODE=${auth_mode})..."
+  touch "${env_file}"
+  set_quickstart_env_value "${env_file}" "OBSERVABILITY_ENABLED" "true"
+  set_quickstart_env_value "${env_file}" "AUTH_MODE" "${auth_mode}"
+  set_quickstart_env_value "${env_file}" "PARTY_HINT" "$(quickstart_party_hint)"
+  set_quickstart_env_value "${env_file}" "TEST_MODE" "off"
+  verify_configured_auth_mode "${auth_mode}"
 }
 
 quickstart_setup() {
